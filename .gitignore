@@ -1,0 +1,21 @@
+# Build outputs
+/FileIndex.exe
+/FileIndex
+/FileIndex-*
+*.test
+
+# Runtime data and local configuration
+/config/config.json
+/data/
+/backup/
+/export/
+
+# Temporary files
+*.tmp
+*.log
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
