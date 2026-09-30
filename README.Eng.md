@@ -91,115 +91,69 @@ This development launcher still requires Go to be installed.
 
 ### Executable icon
 
-The `image` directory contains [`FileIndex.ico`](image/FileIndex.ico) for Windows executable packaging and [`FileIndex-logo.png`](image/FileIndex-logo.png) as its high-resolution source. You can replace both files with your own artwork before packaging a release. Keep the same filenames if your build or packaging script refers to them. Replacing these files does not alter an already-built executable; rebuild or repackage the application after changing the icon.
+The repository includes `icon_windows_amd64.syso`, generated from `image/FileIndex.ico`. Ordinary `go build -o FileIndex.exe .` therefore embeds the Windows x64 icon. Neither ICO nor SYSO needs to accompany the executable. If Explorer caches an old icon, refresh or copy the new executable to another folder to check.
 
-## macOS
+## Cross-platform releases with icons
 
-### Build for the current Mac
-
-```bash
-go build -o FileIndex .
-chmod +x FileIndex
-```
-
-Start it with:
-
-```bash
-./FileIndex
-```
-
-To launch it by double-clicking in Finder, create `start-fileindex.command` next to the executable:
-
-```sh
-#!/bin/sh
-cd "$(dirname "$0")"
-exec ./FileIndex
-```
-
-Make the launcher executable:
-
-```bash
-chmod +x start-fileindex.command
-```
-
-The first launch of an unsigned build may require approval under **System Settings → Privacy & Security**.
-
-### Build for a specific architecture
-
-Apple Silicon:
-
-```bash
-GOOS=darwin GOARCH=arm64 go build -o FileIndex-macos-arm64 .
-```
-
-Intel Mac:
-
-```bash
-GOOS=darwin GOARCH=amd64 go build -o FileIndex-macos-x64 .
-```
-
-## Linux
-
-### Build
-
-```bash
-go build -o FileIndex .
-chmod +x FileIndex
-```
-
-Start it with:
-
-```bash
-./FileIndex
-```
-
-You can also create `start-fileindex.sh`:
-
-```sh
-#!/bin/sh
-cd "$(dirname "$0")"
-exec ./FileIndex
-```
-
-Make it executable and run it:
-
-```bash
-chmod +x start-fileindex.sh
-./start-fileindex.sh
-```
-
-To launch the application from a desktop environment menu, create a `.desktop` file:
-
-```ini
-[Desktop Entry]
-Type=Application
-Name=File Index
-Exec=/absolute/path/to/FileIndex/FileIndex
-Path=/absolute/path/to/FileIndex
-Terminal=false
-Categories=Utility;
-```
-
-Replace `Exec` and `Path` with the actual absolute paths.
-
-## Cross-compile from Windows
-
-Use PowerShell to build all supported targets:
+Requires Go 1.22+ and Python 3.9+ (usually `python3` on macOS/Linux). Run from the project root:
 
 ```powershell
-$env:GOOS="windows"; $env:GOARCH="amd64"; go build -o FileIndex-windows-x64.exe .
-$env:GOOS="linux";   $env:GOARCH="amd64"; go build -o FileIndex-linux-x64 .
-$env:GOOS="darwin";  $env:GOARCH="arm64"; go build -o FileIndex-macos-arm64 .
-$env:GOOS="darwin";  $env:GOARCH="amd64"; go build -o FileIndex-macos-x64 .
+python scripts/build.py --target all
 ```
+
+Or build an individual target:
+
+```powershell
+python scripts/build.py --target windows-amd64
+python scripts/build.py --target darwin-arm64
+python scripts/build.py --target darwin-amd64
+python scripts/build.py --target linux-amd64
+```
+
+The same commands work on Windows, macOS, and Linux; target settings apply only to child processes. Output is in `dist/`: ZIP for Windows, TAR.GZ with executable permissions for macOS/Linux. Archives exclude existing indexes, settings, and backups. End users do not need Go. Minimum OS requirements also depend on the Go toolchain used to build.
+
+| Platform | Icon and launch method |
+| --- | --- |
+| Windows x64 | Extract and double-click `FileIndex.exe`; its icon is embedded. |
+| macOS Apple Silicon / Intel | Extract the matching architecture on a Mac, then double-click `FileIndex.app`; bundled ICNS supplies its Finder icon. |
+| Linux x64 | Extract and run `./FileIndex`, or use the desktop launcher below for an icon and menu entry. |
+
+### macOS
+
+Keep the whole `.app` bundle. Settings, database, backups, and exports are stored **beside** it. Extract into a writable directory and move the bundle together with its data directories.
+
+Packages are not Developer ID signed or notarized. First launch may require approval under **System Settings → Privacy & Security**. Plain `go build -o FileIndex .` still produces a command-line executable; use the `.app` package for a Finder icon.
+
+### Linux
+
+Run inside the extracted package (Python 3 is needed only to set up the launcher):
+
+```bash
+python3 install-desktop.py
+```
+
+This creates `FileIndex.desktop` beside the program and installs a user application-menu entry without administrator privileges. It refers to `FileIndex.png` by absolute path. Run again after moving the folder, changing the USB mount path, or switching computers. Some desktops require marking the launcher as trusted / allowing launch.
+
+Icons appear in Desktop Entry-compatible launchers and menus; file managers do not guarantee a custom icon on the raw ELF executable. macOS/Linux do not directly use Windows ICO resources. The UI still opens in a browser; packaging does not replace the browser's own Dock/taskbar icon.
+
+### Changing artwork
+
+Windows uses `image/FileIndex.ico`; macOS/Linux use the matching high-resolution `image/FileIndex-logo.png`. Replace both sources, then regenerate resources and packages:
+
+```powershell
+python -m pip install Pillow
+python scripts/build.py --refresh-icons --target all
+```
+
+Normal builds use the checked-in SYSO and `image/FileIndex.icns`, requiring neither Pillow nor an icon-tool download. Only `--refresh-icons` uses Pillow for ICNS conversion and downloads/runs pinned `github.com/akavel/rsrc@v0.10.2` via Go for Windows resources. Commit the regenerated artifacts together. Replacing artwork does not update existing executables.
 
 ## Portable directory
 
-A built executable uses its own directory as the portable root. The recommended layout is:
+A built executable uses its own directory as the portable root (beside the bundle for macOS `.app`). The recommended layout is:
 
 ```text
 FileIndex/
-├── FileIndex.exe or FileIndex
+├── FileIndex.exe, FileIndex, or FileIndex.app
 ├── config/
 │   └── config.json
 ├── data/

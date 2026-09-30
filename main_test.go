@@ -11,6 +11,20 @@ import (
 	"testing"
 )
 
+func TestExecutableRoot(t *testing.T) {
+	base := t.TempDir()
+	for _, tc := range []struct{ path, platform, want string }{
+		{filepath.Join(base, "FileIndex.app", "Contents", "MacOS", "FileIndex"), "darwin", base},
+		{filepath.Join(base, "FileIndex"), "darwin", base},
+		{filepath.Join(base, "other", "Contents", "MacOS", "FileIndex"), "darwin", filepath.Join(base, "other", "Contents", "MacOS")},
+		{filepath.Join(base, "FileIndex.app", "Contents", "MacOS", "FileIndex"), "linux", filepath.Join(base, "FileIndex.app", "Contents", "MacOS")},
+	} {
+		if got := executableRoot(tc.path, tc.platform); got != tc.want {
+			t.Errorf("executableRoot(%q, %q) = %q; want %q", tc.path, tc.platform, got, tc.want)
+		}
+	}
+}
+
 func testApp(t *testing.T) *App {
 	t.Helper()
 	root := t.TempDir()

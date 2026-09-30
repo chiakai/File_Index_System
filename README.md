@@ -91,115 +91,69 @@ pause
 
 ### 執行檔圖示
 
-`image` 目錄中的 [`FileIndex.ico`](image/FileIndex.ico) 可供 Windows 執行檔封裝使用，[`FileIndex-logo.png`](image/FileIndex-logo.png) 則是高解析度來源圖。使用者可在封裝發行版本前，以自己的圖案替換這兩個檔案；若建置或封裝腳本引用這些檔名，請維持檔名不變。替換圖片不會直接修改已建置的執行檔，變更圖示後需重新建置或封裝。
+已納入由 `image/FileIndex.ico` 產生的 `icon_windows_amd64.syso`，因此一般 `go build -o FileIndex.exe .` 就會把圖示嵌入 Windows x64 執行檔。不需要另外攜帶 ICO 或 SYSO。若檔案總管仍顯示舊圖示，請重新整理或將新版複製到另一個資料夾確認。
 
-## macOS
+## 含圖示的跨平台發行包
 
-### 建置目前 Mac 的版本
-
-```bash
-go build -o FileIndex .
-chmod +x FileIndex
-```
-
-啟動：
-
-```bash
-./FileIndex
-```
-
-若要從 Finder 雙擊啟動，可在執行檔旁建立 `start-fileindex.command`：
-
-```sh
-#!/bin/sh
-cd "$(dirname "$0")"
-exec ./FileIndex
-```
-
-設定執行權限：
-
-```bash
-chmod +x start-fileindex.command
-```
-
-第一次執行未簽章的程式時，可能需要在「系統設定 → 隱私權與安全性」中允許執行。
-
-### 指定架構
-
-Apple Silicon：
-
-```bash
-GOOS=darwin GOARCH=arm64 go build -o FileIndex-macos-arm64 .
-```
-
-Intel Mac：
-
-```bash
-GOOS=darwin GOARCH=amd64 go build -o FileIndex-macos-x64 .
-```
-
-## Linux
-
-### 建置
-
-```bash
-go build -o FileIndex .
-chmod +x FileIndex
-```
-
-啟動：
-
-```bash
-./FileIndex
-```
-
-也可以建立 `start-fileindex.sh`：
-
-```sh
-#!/bin/sh
-cd "$(dirname "$0")"
-exec ./FileIndex
-```
-
-設定權限並啟動：
-
-```bash
-chmod +x start-fileindex.sh
-./start-fileindex.sh
-```
-
-如需從桌面環境的應用程式選單啟動，可建立 `.desktop` 檔：
-
-```ini
-[Desktop Entry]
-Type=Application
-Name=File Index
-Exec=/完整路徑/FileIndex/FileIndex
-Path=/完整路徑/FileIndex
-Terminal=false
-Categories=Utility;
-```
-
-請將 `Exec` 和 `Path` 改成實際絕對路徑。
-
-## 從 Windows 交叉編譯
-
-在 PowerShell 中可建置所有支援平台：
+需要 Go 1.22+ 與 Python 3.9+（macOS/Linux 通常使用 `python3`）。在專案根目錄執行：
 
 ```powershell
-$env:GOOS="windows"; $env:GOARCH="amd64"; go build -o FileIndex-windows-x64.exe .
-$env:GOOS="linux";   $env:GOARCH="amd64"; go build -o FileIndex-linux-x64 .
-$env:GOOS="darwin";  $env:GOARCH="arm64"; go build -o FileIndex-macos-arm64 .
-$env:GOOS="darwin";  $env:GOARCH="amd64"; go build -o FileIndex-macos-x64 .
+python scripts/build.py --target all
 ```
+
+也可只建置指定平台：
+
+```powershell
+python scripts/build.py --target windows-amd64
+python scripts/build.py --target darwin-arm64
+python scripts/build.py --target darwin-amd64
+python scripts/build.py --target linux-amd64
+```
+
+同一組命令可在 Windows、macOS、Linux 執行；目標設定只套用於子程序。輸出放在 `dist/`，Windows 為 ZIP，macOS/Linux 為保留執行權限的 TAR.GZ。封裝不包含既有索引、設定或備份；使用者不需要安裝 Go。作業系統最低需求亦取決於建置所用的 Go 版本。
+
+| 平台 | 圖示與啟動方式 |
+| --- | --- |
+| Windows x64 | 解壓縮後雙擊 `FileIndex.exe`，圖示嵌入 EXE。 |
+| macOS Apple Silicon / Intel | 在 Mac 解壓縮對應架構版本，雙擊 `FileIndex.app`；Finder 圖示由包內 ICNS 提供。 |
+| Linux x64 | 解壓縮後執行 `./FileIndex`；要有圖示與選單入口，使用下方桌面啟動器。 |
+
+### macOS
+
+請保留完整的 `.app`。設定、資料庫、備份與匯出目錄會建立在 `.app` **旁邊**，請解壓縮到可寫入的資料夾，移動時一起帶走資料目錄。
+
+發行包未經 Developer ID 簽章或公證，首次啟動可能需要在「系統設定 → 隱私權與安全性」允許執行。單獨 `go build -o FileIndex .` 仍可建立命令列執行檔，但要有 Finder 圖示請使用 `.app` 發行包。
+
+### Linux
+
+在解壓縮後的發行包目錄執行（僅設定啟動器需要 Python 3）：
+
+```bash
+python3 install-desktop.py
+```
+
+腳本會在程式旁建立 `FileIndex.desktop`，並安裝使用者的應用程式選單入口，不需要管理員權限。啟動器使用 `FileIndex.png` 的絕對路徑；移動資料夾、隨身碟掛載路徑改變或換電腦後，請重新執行。部分桌面環境需將啟動器標記為「允許啟動」。
+
+Linux 圖示顯示於支援 Desktop Entry 的啟動器／選單；原始 ELF 執行檔不保證在檔案管理員顯示自訂圖示。macOS/Linux 不直接使用 Windows ICO。介面仍在瀏覽器中開啟，不會替換瀏覽器本身的 Dock／工作列圖示。
+
+### 更新圖案
+
+Windows 使用 `image/FileIndex.ico`，macOS/Linux 使用同圖案的高解析度 `image/FileIndex-logo.png`。請同時替換兩個來源，再重新產生資源與發行包：
+
+```powershell
+python -m pip install Pillow
+python scripts/build.py --refresh-icons --target all
+```
+
+一般建置使用版本控制中的 SYSO 與 `image/FileIndex.icns`，不需要 Pillow 或下載圖示工具。只有 `--refresh-icons` 會用 Pillow 轉換 ICNS，並透過 Go 下載／執行固定版本 `github.com/akavel/rsrc@v0.10.2` 產生 Windows 資源；請將更新後的產物一起提交。替換圖片不會更新既有執行檔。
 
 ## Portable 目錄
 
-建置後，程式以執行檔所在目錄作為 Portable Root。建議結構如下：
+建置後，程式以執行檔所在目錄作為 Portable Root（macOS `.app` 使用 bundle 所在目錄）。建議結構如下：
 
 ```text
 FileIndex/
-├── FileIndex.exe 或 FileIndex
+├── FileIndex.exe、FileIndex 或 FileIndex.app
 ├── config/
 │   └── config.json
 ├── data/

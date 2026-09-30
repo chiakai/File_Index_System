@@ -1,13 +1,13 @@
 # File Index System V1.0 規格書
 
-文件版本：1.0  
+文件版本：1.1（依目前 README 同步）\
 整理日期：2026-09-30  
 文件語言：繁體中文  
-用途：功能、資料模型、介面與技術基線；不包含程式實作。
+用途：功能、資料模型、介面、建置與發行規格；區分目前行為及待整合項目。
 
 ## 1. 文件依據與決策優先序
 
-本文件整合「開發媒體索引程式」對話中可取得的 V1.0 Baseline Specification、Backend API Specification、File Details／Locate 決策，以及本次指定的技術 Stack。較新的基線規格優先於較早的 API 範例。
+本文件保留 V1.0 功能與 API 設計基線，並依目前 [README.md](README.md) 同步已公開的操作、建置、跨平台圖示封裝與 Portable 行為。README 明確描述的目前行為優先於舊版規格；其未涵蓋的詳細契約仍保留為設計基線，不代表全部已實作或完成平台驗證。文件版本更新不改變 SQLite Schema 版本。
 
 整合時已套用下列修訂：
 
@@ -17,7 +17,7 @@
 - API 統一掛在 `/api/v1`；新增 Storage 透過首次 Scan 成功後建立，不另設 `POST /storages`。
 - CSV 編碼依最終技術基線採 UTF-8 + BOM。
 
-來源讀取介面此次回傳最近五組對話，且未提供更早頁面；其中包含完整的基線規格與詳細 API 設計。無法從這些內容確認的細節集中於第 18 節，未冒稱為既有定案。UI Wireframe 是依上述功能整理的文字示意，不代表已定案的像素、配色或排版。
+本次同步包含四段式檔名／路徑排序、大小與日期顯示、頂部掃描／結束控制、跨平台選取檔案、圖示資源、發行腳本與 macOS bundle 外的資料目錄。原生目錄／資料庫選擇器及 Filesystem identity 比對仍待整合，目前使用經驗證的路徑欄位。UI Wireframe 是功能示意；目前畫面以 README 的截圖與操作說明為準。
 
 ## 2. 系統定位與範圍
 
@@ -37,7 +37,7 @@ File Index System 是個人使用、離線、跨平台、Portable 的檔案中�
 |---|---|
 | Search | 檔名／相對目錄部分比對、多關鍵字 AND、篩選、排序、分頁 |
 | File Details | 顯示索引資訊及來源可用狀態 |
-| Open Folder | 來源可用時，以系統檔案管理員開啟所在目錄 |
+| Open Folder | 來源可用時開啟所在目錄，在支援的平台選取索引檔案 |
 | Storage | 新增、掃描、重掃、定位、檢視、編輯、匯出、刪除 |
 | Scan／Rescan | 遞迴讀取 Metadata，使用 staging 保護正式索引 |
 | CSV | 匯出全部搜尋結果或單一 Storage 索引 |
@@ -63,18 +63,18 @@ File Index System 是個人使用、離線、跨平台、Portable 的檔案中�
 | Backend | Go | Scanner、Search、Storage、Job Manager、Backup、OS Adapter |
 | HTTP Server | Go `net/http` | 本機 HTTP API 與 Web UI 靜態資源 |
 | Database | SQLite | 單一 `fileindex.db` 保存索引 |
-| Frontend | HTML／CSS／TypeScript 輕量前端 | 表格、表單、對話框、狀態與導覽 |
+| Frontend | HTML／CSS／JavaScript 輕量前端 | `web/index.html` 提供表格、表單、對話框、狀態與導覽 |
 | 通訊 | HTTP + JSON | Browser 與 Backend 交換資料 |
 | 長時間工作 | Go Job Manager + HTTP polling | Scan、CSV Export |
 | UI 封裝 | Go embed | 將建置後 HTML／CSS／JavaScript 嵌入執行檔 |
 | 設定 | JSON `config.json` | Portable 設定 |
 | CSV | UTF-8 + BOM | 改善 Excel 中文相容性 |
 | 時間 | UTC ISO 8601 | DB／API 統一時間格式 |
-| 發布 | 各平台 Native Executable | 使用者無須另外安裝語言執行環境 |
+| 發布 | Windows EXE、macOS APP、Linux 執行檔與 Desktop Entry | 各平台圖示與可攜式發行包；執行程式不需 Go |
 
-前端建置工具僅屬開發環境；發布後由使用者的系統瀏覽器執行已建置資源。不需要 Electron 或額外 Application Server。
+`//go:embed web` 在 Go 編譯時嵌入 `web/index.html` 等介面資源，發布後由系統瀏覽器顯示，不需要另外攜帶 `web/`。修改網頁後須重新編譯；目前不需要 TypeScript 建置步驟、Electron 或額外 Application Server。
 
-SQLite Driver 尚未指定套件。原對話建議優先評估 Pure-Go 路線，以簡化跨平台建置，但正式選型須先驗證效能與備份支援，不能視為特定 Driver 已定案。
+目前 SQLite Driver 為 `modernc.org/sqlite`，版本依 `go.mod`；發行腳本採 `CGO_ENABLED=0` 交叉編譯。
 
 ### 3.2 平台矩陣
 
@@ -87,29 +87,29 @@ SQLite Driver 尚未指定套件。原對話建議優先評估 Pure-Go 路線，
 
 各平台共用原始碼、Web UI、Application Logic、SQLite Schema、`fileindex.db` 與 `config.json`；發布各自的原生執行檔。跨 OS 後來源掛載位置可能不同，透過 Locate 更新。
 
+此矩陣為發行目標，實際最低 OS 需求亦受所用 Go 工具鏈限制，不表示所有系統版本均已完成實機驗證。建置與圖示封裝規則見第 4.4～4.6 節。
+
 ## 4. Portable 與系統架構
 
 ### 4.1 發布目錄
 
 ```text
 FileIndex/
-├── Windows/
-│   └── FileIndex.exe
-├── Linux/
-│   └── FileIndex
-├── macOS/
-│   ├── FileIndex-arm64
-│   └── FileIndex-x64
+├── FileIndex.exe、FileIndex 或 FileIndex.app
 ├── data/
 │   └── fileindex.db
 ├── config/
 │   └── config.json
 ├── backup/
 ├── export/
-└── README.txt
+└── LICENSE
 ```
 
 所有 Application Path 以 Portable Root 為基準保存相對路徑，例如 `data/fileindex.db`；不得把安裝磁碟機代號寫死在設定。啟動時先解析 Portable Root，再解析設定路徑。
+
+各平台分開發行，並非將四個執行檔放入不同子目錄後自動共用上一層資料。Windows／Linux 與 macOS 單獨執行檔以執行檔所在目錄為 Portable Root；macOS `FileIndex.app/Contents/MacOS/FileIndex` 則以 `.app` 所在目錄為 Root，資料不寫入 bundle。`go run .` 使用含 `go.mod` 的專案目錄。
+
+可由捷徑、BAT、Shell Script、Finder 或應用程式選單啟動，Root 不依啟動時的工作目錄改變。資料目錄需可寫入；搬移既有資料時，將程式（macOS 為完整 `.app`）與 `config/`、`data/`、所需備份及匯出目錄一起攜帶。
 
 此規則適用於程式資料、備份、匯出等 Application Path；來源 Storage 的 `last_scan_root`／`current_root` 則是所屬 OS 的來源根目錄路徑，兩者不可混淆。
 
@@ -131,7 +131,8 @@ FileIndex/
                        │
              Export／Backup／Restore
 
-Backend OS Adapter → 原生選擇對話框、Filesystem 資訊、檔案管理員
+Backend OS Adapter → 路徑驗證、檔案管理員
+                   （原生選擇對話框、Filesystem identity 比對待整合）
 ```
 
 Browser 不直接存取 SQLite、不自行組合 Open Folder 的本機絕對路徑、不執行 OS Command。上述責任均屬 Backend。
@@ -147,6 +148,62 @@ Browser 不直接存取 SQLite、不自行組合 Open Folder 的本機絕對路�
 `http_port = 0` 表示由 OS 自動配置可用 Port。預設服務位址為 `127.0.0.1`；如提供 IPv6，只能使用 Loopback `::1`，不得預設監聽 `0.0.0.0` 或公開網路介面。
 
 UI 提供 Exit File Index。Scan 執行中一般結束要求回 `409 SCAN_IN_PROGRESS`；使用者確認後送 `force: true`，Backend 取消 Scan、回滾／丟棄 staging、關閉 SQLite 與 HTTP Server，再結束程序。
+
+停用自動開啟瀏覽器時，使用終端機顯示的一次性 Session URL。掃描進度、Cancel scan 與 Exit File Index 位於頂部導覽列 Settings 右側。
+
+### 4.4 開發與建置
+
+開發需 Go 1.22+，在含 `go.mod` 的專案根目錄執行：
+
+```powershell
+go mod tidy
+go run .
+```
+
+Windows x64 可直接建置並啟動含圖示的執行檔：
+
+```powershell
+go build -o FileIndex.exe .
+.\FileIndex.exe
+```
+
+成功的 `go build` 通常不輸出訊息。使用者執行編譯成品不需要 Go；開發用 `go run .` 仍需要 Go。BAT 可使用 `cd /d "%~dp0"` 與 `start "" "%~dp0FileIndex.exe"` 啟動同目錄成品。
+
+### 4.5 跨平台發行與圖示
+
+發行腳本需 Go 1.22+ 與 Python 3.9+；macOS／Linux 通常使用 `python3`。在專案根目錄執行：
+
+```powershell
+python scripts/build.py --target all
+```
+
+`--target` 亦可指定下表任一單一目標。同一命令可在 Windows、macOS、Linux 執行；目標平台環境變數只套用於子程序。輸出位於 `dist/`，不打包既有索引、設定或備份。
+
+| 目標 | 發行檔案 | 圖示與啟動方式 |
+|---|---|---|
+| `windows-amd64` | `FileIndex-windows-amd64.zip` | EXE 內嵌 ICO，解壓縮後雙擊 `FileIndex.exe` |
+| `darwin-arm64` | `FileIndex-darwin-arm64.tar.gz` | Apple Silicon 的 `FileIndex.app`，Finder 使用 bundle 內 ICNS |
+| `darwin-amd64` | `FileIndex-darwin-amd64.tar.gz` | Intel Mac 的 `FileIndex.app`，Finder 使用 bundle 內 ICNS |
+| `linux-amd64` | `FileIndex-linux-amd64.tar.gz` | `FileIndex`、`FileIndex.png` 與 `install-desktop.py` |
+
+macOS／Linux TAR.GZ 保留執行權限。macOS 須在 Mac 解壓縮並保留完整 `.app`；目前未經 Developer ID 簽章或公證，首次啟動可能需在「系統設定 → 隱私權與安全性」允許執行。單獨 `go build -o FileIndex .` 產生的是命令列執行檔，不提供 Finder 應用程式圖示。
+
+Linux 可直接執行 `./FileIndex`。如需圖示與應用程式選單入口，在解壓縮目錄執行 `python3 install-desktop.py`；僅設定啟動器需要 Python 3，不需管理員權限。腳本在程式旁建立 `FileIndex.desktop` 並安裝使用者選單入口。因圖示與程式使用絕對路徑，移動資料夾、變更隨身碟掛載路徑或換電腦後須重新執行；部分桌面環境需標記為「允許啟動」。
+
+Linux 圖示適用於支援 Desktop Entry 的啟動器／選單，不保證原始 ELF 在檔案管理員有自訂圖示。macOS／Linux 不直接使用 Windows ICO。介面仍在瀏覽器中執行，不替換瀏覽器的 Dock／工作列圖示。
+
+### 4.6 圖示來源與更新
+
+- Windows 來源為 `image/FileIndex.ico`，已產生並納入版本控制的 `icon_windows_amd64.syso` 由一般 `go build` 自動連結；執行時無須另外攜帶 ICO 或 SYSO。
+- macOS／Linux 使用相同圖案的高解析度 `image/FileIndex-logo.png`；macOS 的 `image/FileIndex.icns` 亦納入版本控制。
+- 更換圖案時同時替換 ICO 與 PNG，再執行：
+
+```powershell
+python -m pip install Pillow
+python scripts/build.py --refresh-icons --target all
+```
+
+一般建置不需 Pillow 或下載圖示工具；只有 `--refresh-icons` 用 Pillow 轉換 ICNS，並透過 Go 下載／執行固定版本 `github.com/akavel/rsrc@v0.10.2` 產生 Windows 資源。更新後須一併提交 SYSO 與 ICNS；替換來源圖片不會更新既有執行檔。檔案總管若快取舊圖示，可重新整理或將新版複製至其他資料夾確認。
 
 ## 5. Storage 模型與 Locate
 
@@ -175,7 +232,9 @@ current_root   = /Volumes/BACKUP_A
 
 ### 5.3 Locate 流程
 
-1. 選擇既有 Storage，開啟原生目錄選擇對話框。
+目前流程使用經驗證的路徑欄位；以下原生選擇器與 identity 差異確認為待整合設計，不應視為現有功能：
+
+1. 選擇既有 Storage，指定目錄（原生目錄選擇對話框待整合）。
 2. Backend 驗證路徑存在並取得 Filesystem 資訊。
 3. 與上次掃描資料差異明顯時顯示警告，回 `409 STORAGE_INFORMATION_CHANGED`。
 4. 使用者確認後可用 `confirm_mismatch: true` 繼續。
@@ -280,7 +339,7 @@ V1 不提供 OR、NOT、Regex 或複雜布林語法。
 |---|---|
 | Storage Filter | 指定 Storage |
 | Extension Filter | 指定副檔名 |
-| 排序 | Filename、Storage、Size、Modified，由 Backend 執行 |
+| 排序 | Filename／Relative Path 四段切換；Storage、Size、Modified 升降冪，由 Backend 執行 |
 | 預設排序 | Filename ASC |
 | 分頁 | Backend 分頁；預設每頁 100 筆 |
 | Extension 選項 | 由獨立 API 統計，可限制 Storage，不從當頁結果推導 |
@@ -289,13 +348,15 @@ V1 不提供 OR、NOT、Regex 或複雜布林語法。
 
 結果列顯示 Filename／Relative Path、Storage、Size、Modified。點擊整筆結果開啟 File Details，顯示 Filename、Storage、Relative Path、Size、Modified、Storage Last Scan 及 Source 狀態。
 
+Filename／Relative Path 表頭依序切換「檔名升冪 → 路徑加檔名升冪 → 檔名降冪 → 路徑加檔名降冪」，以 `F`／`P+F` 與箭頭表示模式。Storage、Size、Modified 首次點擊升冪，再次點擊切換降冪。大小自動使用 B、KB、MB、GB、TB、PB；窄畫面可將數字與單位分行。日期時間依 Settings → Date and time format 顯示，必要時日期與時間分行；不改變 DB／API 的 UTC 格式。
+
 來源離線不妨礙搜尋與 Details 的索引資料顯示。這些資料代表最後成功 Scan 時的快照，不保證來源目前仍相同。
 
 ## 8. File Details 與 Open Folder
 
 File Details 開啟時，Backend 依 `current_root` 計算來源可用性。可用時提供 Open Folder；未定位／離線時提供狀態說明與 Locate Storage 入口。
 
-Open Folder 只開啟檔案所在目錄，不啟動檔案：
+Open Folder 開啟所在目錄，支援時選取索引檔案，但不啟動檔案內容：
 
 ```text
 file_id → DB 查得 Storage 與 relative_path
@@ -306,9 +367,9 @@ file_id → DB 查得 Storage 與 relative_path
 
 | 平台 | 開啟工具 |
 |---|---|
-| Windows | File Explorer |
-| macOS | Finder |
-| Linux | 系統預設 File Manager |
+| Windows | File Explorer，顯示並選取檔案 |
+| macOS | Finder，顯示並選取檔案 |
+| Linux | 支援 `org.freedesktop.FileManager1` 的桌面可顯示並選取檔案 |
 
 Browser 只傳 File ID；Backend 負責路徑解析與 OS 操作。來源不可用回 `STORAGE_OFFLINE`；Root 存在但索引目錄已不存在回 `DIRECTORY_NOT_FOUND`。即使 Details 先前顯示 Available，Open Folder 執行時仍須重新檢查。
 
@@ -331,7 +392,7 @@ UI 以 500 ms～1 秒間隔 polling，顯示 Current Directory、Files Scanned�
 ### 9.3 Rescan
 
 1. 指定既有 Storage 與掃描 Root。
-2. 比較 Filesystem 輔助資訊；差異明顯時要求使用者確認。
+2. 驗證輸入路徑；Filesystem identity 比對及差異確認仍待平台整合。
 3. 保留舊索引，將新結果寫入獨立 staging。
 4. 掃描成功後，在單一交易中替換該 Storage 的 files，更新統計、Filesystem 資訊、`last_scan_at`、`last_scan_root`、`current_root`。
 5. 交易失敗則回滾；取消或掃描失敗則丟棄 staging，保留舊索引及其掃描資訊。
@@ -409,7 +470,7 @@ Restore 是完整取代目前 DB，不是 Merge。UI 用語固定為 **Restore f
   → 恢復服務
 ```
 
-維護期間其他 DB API 回 `503 DATABASE_MAINTENANCE`。從外部檔案還原使用原生 File Picker，選擇 `.db`；副檔名不能取代 SQLite 與 Schema 驗證。V1 對應版本為 1，不應將未知版本直接當作相容。
+維護期間其他 DB API 回 `503 DATABASE_MAINTENANCE`。目前從外部檔案還原使用經驗證的路徑欄位；原生 `.db` File Picker 待整合。副檔名不能取代 SQLite 與 Schema 驗證。V1 對應版本為 1，不應將未知版本直接當作相容。
 
 自動備份失敗、替換失敗及重新開啟失敗的詳細復原流程，原對話未完整指定，列為實作前必要細節。
 
@@ -424,7 +485,8 @@ Restore 是完整取代目前 DB，不是 Merge。UI 用語固定為 **Restore f
   "export_path": "export",
   "search_page_size": 100,
   "http_port": 0,
-  "auto_open_browser": true
+  "auto_open_browser": true,
+  "time_format": "locale"
 }
 ```
 
@@ -436,18 +498,20 @@ Restore 是完整取代目前 DB，不是 Merge。UI 用語固定為 **Restore f
 | `search_page_size` | 搜尋每頁筆數，預設 100 |
 | `http_port` | HTTP Port，0 表示自動配置 |
 | `auto_open_browser` | 啟動時是否開啟預設瀏覽器 |
+| `time_format` | UI 日期時間格式，預設 `locale`；亦支援 `yyyy-mm-dd-24h`、`yyyy-slash-24h`、`us-12h`、`eu-24h` |
 
 Settings API 讀取與保存上述設定。設定變更哪些即時生效、哪些需重新啟動，以及切換 DB 路徑是否包含資料搬移，未在原對話定案，不可自行等同為自動搬移 DB。
 
 ## 13. UI Wireframe 與狀態
 
-主要導覽為 Search、Storage、Backup、Settings；Search 為首頁。
+主要導覽為 Search、Storage、Backup、Settings；Search 為首頁。掃描進度、Cancel scan 與 Exit File Index 放在頂部 Settings 右側；以下框線僅為功能示意。
 
 ### 13.1 Search 首頁
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│ File Index                 Search | Storage | Backup | Settings │
+│ File Index   Search | Storage | Backup | Settings             │
+│                       掃描進度 [Cancel scan] [Exit File Index] │
 ├────────────────────────────────────────────────────────────┤
 │ 搜尋 [ ABB REF615 manual                         ] [Search] │
 │ Storage [全部 ▼]   Extension [全部 ▼]         [Export CSV] │
@@ -458,7 +522,7 @@ Settings API 讀取與保存上述設定。設定變更哪些即時生效、哪�
 │                                                            │
 │ 共 126 筆                  [上一頁] 1 / 2 [下一頁]          │
 ├────────────────────────────────────────────────────────────┤
-│ ● Ready                                  [Exit File Index] │
+│ ● Ready                                                    │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -492,9 +556,11 @@ Filesystem / Capacity / Files / Indexed Size / Last Scan
 [Export CSV] [Delete]
 
 Add → Select Directory → Inspect → Name / Description → Scan
-Rescan → Select Root → 比對資訊 → 必要時警告確認 → Scan
-Locate → Select Current Root → 必要時警告確認 → 更新位置
+Rescan → 指定 Root → 驗證路徑 → Scan
+Locate → 指定 Current Root → 驗證路徑 → 更新位置
 ```
+
+原生路徑選擇器及 Filesystem identity 差異警告為後續整合項目。
 
 ### 13.4 Scan Progress
 
@@ -523,6 +589,7 @@ Export Path         [export]
 Search Page Size    [100]
 HTTP Port           [0]
 Auto Open Browser   [✓]
+Date and time format [locale ▼]
                                                     [Save]
 ```
 
@@ -533,7 +600,7 @@ Auto Open Browser   [✓]
 | Ready | 可正常操作 |
 | Offline／Not located | 可查索引；提供 Locate |
 | Root 存在但目錄不存在 | 顯示 Directory Not Found |
-| Filesystem 資訊不一致 | 顯示 previous／current 比較，讓使用者決定 |
+| Filesystem 資訊不一致（待整合） | 設計為顯示 previous／current 比較，讓使用者決定 |
 | Scan 進行中 | 顯示統計；第二個 Scan 回衝突 |
 | Cancelling | 持續 polling，等待清理完成 |
 | Database Maintenance | 說明還原中，DB 功能暫不可用 |
@@ -594,8 +661,8 @@ Base URL：`http://127.0.0.1:<port>/api/v1`。UI 位於 `/`。以下路徑皆省
 | Method | Path | 功能／契約 |
 |---|---|---|
 | GET | `/system/status` | version、database_ready、schema_version、active_scan |
-| POST | `/system/select-directory` | 原生目錄選擇；回 path |
-| POST | `/system/select-database-file` | 原生 `.db` 檔選擇 |
+| POST | `/system/select-directory` | 原生目錄選擇為待整合契約；目前使用路徑欄位 |
+| POST | `/system/select-database-file` | 原生 `.db` 選擇為待整合契約；目前使用路徑欄位 |
 | POST | `/system/inspect-storage` | 收 path；回 Filesystem 輔助資訊 |
 | POST | `/system/shutdown` | 結束程序；可傳 force |
 | GET | `/files/search` | 搜尋、篩選、排序、分頁 |
@@ -617,7 +684,7 @@ Base URL：`http://127.0.0.1:<port>/api/v1`。UI 位於 `/`。以下路徑皆省
 | POST | `/backups` | 建立安全備份 |
 | DELETE | `/backups/{id}` | 刪除指定備份 |
 | POST | `/backups/{id}/restore` | 還原已知備份 |
-| POST | `/database/restore` | 從原生 File Picker 所選 path 還原 |
+| POST | `/database/restore` | 從經 Backend 驗證的 path 還原；原生 Picker 待整合 |
 | GET | `/settings` | 讀設定 |
 | PUT | `/settings` | 保存設定至 config.json |
 
@@ -629,7 +696,7 @@ Base URL：`http://127.0.0.1:<port>/api/v1`。UI 位於 `/`。以下路徑皆省
 GET /api/v1/files/search?q=ABB%20REF615&storage_id=3&extension=pdf&page=1&page_size=100&sort=name&order=asc
 ```
 
-每筆結果包含 `id`、`storage_id`、`storage_name`、`name`、`extension`、`relative_path`、`size_bytes`、`modified_at`，加上 14.1 的分頁 meta。排序四種欄位已定案，但除 `name` 範例外，其餘 `sort` 參數字串待明確化。
+每筆結果包含 `id`、`storage_id`、`storage_name`、`name`、`extension`、`relative_path`、`size_bytes`、`modified_at`，加上 14.1 的分頁 meta。`sort` 支援 `name`、`path_name`、`storage`、`size`、`modified`；`order` 為 `asc`／`desc`。四段式 Filename／Relative Path 分別對應 `name/asc`、`path_name/asc`、`name/desc`、`path_name/desc`。
 
 ### 14.4 File Details
 
@@ -787,11 +854,11 @@ Rescan：
 
 ## 16. 效能與發行驗證範圍
 
-原對話以百萬筆以上 Metadata 作為需評估的情境，但未承諾搜尋延遲、掃描速度或記憶體上限。正式選定 SQLite Driver 前應評估批次寫入、substring search、分頁、排序、CSV Export 與 Rescan 原子替換。
+原對話以百萬筆以上 Metadata 作為需評估的情境，但未承諾搜尋延遲、掃描速度或記憶體上限。應持續以目前 SQLite Driver 評估批次寫入、substring search、分頁、排序、CSV Export 與 Rescan 原子替換。
 
 Go 的 goroutine／channel 用於維持 HTTP UI 與長時間工作的回應能力；不代表對 HDD 啟用大量平行 I/O。平行度與批次大小待量測決定。
 
-各平台發布需驗證原生目錄／檔案選擇、Filesystem 資訊、檔案管理員啟動、Portable 相對路徑與共用 DB 的行為。Linux 發行版、最低 macOS 版本及桌面環境相依性尚未列明。
+各平台發布需驗證檔案管理員開啟與選取、Portable 相對路徑、共用 DB、圖示與封裝啟動行為。Windows 檢查 EXE 圖示；macOS 檢查 Finder 圖示、bundle 啟動及資料寫至 bundle 旁；Linux 檢查 Desktop Entry、特殊字元路徑與搬移後重新安裝啟動器。原生 Picker 與 Filesystem identity 比對列為後續整合驗證。成功交叉編譯或檢查封裝結構不等於已在目標 OS 完成實機驗證；實際最低 OS 需求依 Go 工具鏈與桌面環境確認。
 
 ## 17. 驗收檢核
 
@@ -817,21 +884,29 @@ Go 的 goroutine／channel 用於維持 HTTP UI 與長時間工作的回應能�
 | A16 | Delete Storage | 僅刪除 DB 索引，來源檔案保留 |
 | A17 | CSV 含中文 | 以 UTF-8 + BOM 輸出，文字可正常讀取 |
 | A18 | Schema 檢查 | 正式 V1 DB 的 user_version 為 1 |
+| A19 | 重複點擊 Filename／Relative Path | 四段排序依序切換，F／P+F 與箭頭正確 |
+| A20 | 修改日期格式或縮窄畫面 | 日期格式依設定；大小及日期時間可適當分行 |
+| A21 | Windows x64 一般建置 | EXE 內嵌圖示，執行時不依賴外部 ICO／SYSO |
+| A22 | 建置全部發行包 | 產生四個目標，ZIP／TAR.GZ 格式正確，不含既有使用者資料 |
+| A23 | macOS APP 啟動及搬移 | 保留完整 bundle；圖示可見，資料保存在 APP 旁 |
+| A24 | Linux 桌面啟動器 | 使用者選單有圖示；位置改變後重建入口可啟動 |
+| A25 | 更新圖案並重新封裝 | SYSO／ICNS 與發行包更新；普通建置不需 Pillow |
+| A26 | 從不同工作目錄啟動 | Portable Root 維持執行檔或 APP 所在目錄 |
 
-## 18. 尚未在可取得對話中定案的細節
+## 18. 待整合項目與仍需確認的細節
 
-以下不是新增需求；是避免在開發時以猜測填補既有契約的明確待辦：
+README 明確列出的待整合項目為原生目錄／資料庫檔案選擇器及 Filesystem identity 比對，目前以經驗證的路徑欄位提供工作流程。以下保留舊版規格中 README 尚未涵蓋的詳細契約待核對項目；不表示程式完全沒有相關實作，亦不新增需求：
 
 1. **settings Table**：欄位、主鍵、資料用途及與 JSON 設定的分工。
 2. **Scan 成功與 Warning**：可跳過的錯誤、不可提交的錯誤、部分目錄無權限時的處理；解決「完整成功」與 completed 含 Warning 的界線。
 3. **掃描規則**：符號連結、junction、隱藏／系統檔、排除規則、特殊檔案、跨掛載點、非法或無法轉換的檔名。
-4. **Search 細節**：大小寫與 Unicode 比對、空白詞拆分、空查詢、`%`／`_` literal 語意、穩定次排序、NULL 排序、頁數上限、其餘 sort enum。
+4. **Search 細節**：大小寫與 Unicode 比對、空白詞拆分、空查詢、`%`／`_` literal 語意、穩定次排序、NULL 排序、頁數上限；排序模式與 enum 已同步至第 7、14 節。
 5. **檔案欄位正規化**：副檔名大小寫、無副檔名的 NULL／空字串政策、同一路徑唯一性與 Rescan 後 File ID 穩定性。
 6. **staging 實作與互斥**：暫存 DB 或其他形式、崩潰後清理、Scan 與 Delete／Locate／Restore／Export 等同時操作的規則。
 7. **Restore 失敗復原**：自動備份失敗時的阻擋、替換方式、重新開啟失敗時回復、版本不相容處理；不得自行假設已有 Migration。
 8. **CSV 完整契約**：換行格式、NULL 表示、公式型文字處理、同名檔案處理與下載／開啟匯出檔的 UI 交付方式。
 9. **Settings 生效時機**：即時／重啟項目、驗證範圍、設定損壞處理、DB 路徑變更語意。
 10. **Job／API 邊界**：Job 留存期限、Export 失敗狀態、原生 Picker 取消回應、Token 拒絕狀態碼、各端點未列明的錯誤對應。
-11. **套件及發布**：SQLite Driver、Native Dialog 方案、精確工具版本、最低 OS／Linux 桌面環境與實測效能門檻。
+11. **平台整合及驗證**：Native Dialog 方案、Filesystem identity 比對、最低 OS／Linux 桌面環境與實測效能門檻。SQLite Driver 與目前圖示工具、發行格式已記錄於第 3、4 節。
 
-本文件已完成 V1 功能與技術基線整合；上述未決細節保留可追溯性，不以新增功能或虛構既有決策填補。本次交付僅為 Markdown 規格書，未開始程式開發。
+本文件依目前 README 同步使用者可見行為與發行規格；未涵蓋的詳細設計保留供後續核對。本次修訂僅更新規格文件，不代表新增功能或新增平台實機驗證結果。

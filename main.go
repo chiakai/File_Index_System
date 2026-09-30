@@ -173,7 +173,20 @@ func portableRoot() (string, error) {
 			}
 		}
 	}
-	return filepath.Dir(exe), nil
+	return executableRoot(exe, runtime.GOOS), nil
+}
+
+// Keep portable data beside the macOS bundle, not inside its signed contents.
+func executableRoot(exe, platform string) string {
+	dir := filepath.Dir(exe)
+	if platform == "darwin" && filepath.Base(dir) == "MacOS" {
+		contents := filepath.Dir(dir)
+		bundle := filepath.Dir(contents)
+		if filepath.Base(contents) == "Contents" && strings.HasSuffix(filepath.Base(bundle), ".app") {
+			return filepath.Dir(bundle)
+		}
+	}
+	return dir
 }
 
 func defaultConfig() Config {

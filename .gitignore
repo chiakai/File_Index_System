@@ -3,6 +3,8 @@
 /FileIndex
 /FileIndex-*
 *.test
+/dist/
+__pycache__/
 
 # Runtime data and local configuration
 /config/config.json
