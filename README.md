@@ -1,74 +1,74 @@
 # File Index System
 
-**English** | [繁體中文](README.zh-TW.md)
+[English](README.Eng.md) | **繁體中文**
 
-<p align="center"><img src="image/FileIndex-logo.png" alt="File Index System FI logo" width="128"></p>
+<p align="center"><img src="image/FileIndex-logo.png" alt="File Index System FI 標誌" width="128"></p>
 
-## Project origin
+## 專案起源
 
-This project was inspired by **CD Index 光碟索引大師**, freeware written by Tsai Ming-Hsiu (蔡明修). After using it for many years, I found it to be a very practical utility. On my current system, however, it sometimes reports an error after being left idle for too long. With AI development tools becoming widely available, I asked AI to help define the specification and develop this project.
+本專案起源是 **CD Index 光碟索引大師**，這套由蔡明修所撰寫的免費軟體。我使用多年，覺得它是一個很實用的工具程式；但在目前的系統上，不知為何開啟後若閒置太久便會出現錯誤。加上現在 AI 工具盛行，於是請 AI 協助訂定規格並進行開發。
 
-For an introduction to **CD Index 光碟索引大師**, see [布丁布丁吃什麼？— CD Index 光碟索引大師](https://blog.pulipuli.info/2016/05/cd-index-cd-index-download.html).
+**CD Index 光碟索引大師**的說明可參考[布丁布丁吃什麼？— CD Index 光碟索引大師](https://blog.pulipuli.info/2016/05/cd-index-cd-index-download.html)。
 
-File Index System is a portable, offline file metadata indexer based on the V1 specification. It stores filenames, relative paths, sizes, and modification times in SQLite so indexed files remain searchable when their source storage is offline.
+File Index System 是依照 V1 規格開發的可攜式離線檔案中繼資料索引工具。它會將指定目錄中的檔名、相對路徑、大小及修改時間保存至 SQLite；來源磁碟離線後，仍可搜尋索引並確認檔案原本存放的位置。
 
-## Features
+## 功能
 
-- Filename and relative-path search with multi-keyword AND, storage and extension filters, four-step filename/path sorting, and pagination
-- Add, edit, locate, rescan, export, and delete storage indexes
-- Atomic staging scans with cancellation support
-- Asynchronous UTF-8 BOM CSV exports
-- Validated SQLite backup and complete restore with an automatic safety backup
-- Portable JSON settings for page size, HTTP port, browser launch, and date-time display format
-- Reveal and select indexed files in Windows, macOS, and Linux desktops that support `org.freedesktop.FileManager1`
+- 檔名與相對路徑搜尋、多關鍵字 AND、Storage／副檔名篩選、四段式檔名／路徑排序及分頁
+- Storage 新增、編輯、定位、重新掃描、匯出與刪除
+- 使用 staging 與交易保護正式索引的掃描流程，以及取消掃描
+- UTF-8 BOM CSV 非同步匯出
+- SQLite 安全備份、驗證及完整還原；還原前會自動備份現有資料庫
+- Portable JSON 設定，包括搜尋頁面筆數、HTTP Port、自動開啟瀏覽器及日期時間格式
+- 在 Windows、macOS，以及支援 `org.freedesktop.FileManager1` 的 Linux 桌面中顯示並選取索引檔案
 
-## Screenshots
+## 畫面預覽
 
-![File Index System search screen](image/System-01.png)
+![File Index System 搜尋畫面](image/System-01.png)
 
-![File Index System storage screen](image/System-02.png)
+![File Index System Storage 畫面](image/System-02.png)
 
-## Using the interface
+## 介面操作
 
-- Click **Filename / Relative Path** repeatedly to cycle through filename ascending, path plus filename ascending, filename descending, and path plus filename descending. The `F` or `P+F` marker and arrow show the active mode.
-- Click **Storage**, **Size**, or **Modified** to sort ascending; click the same heading again to switch between ascending and descending.
-- File sizes automatically use B, KB, MB, GB, TB, or PB. The number and unit may wrap separately on narrow screens.
-- Dates and times use the format selected under **Settings → Date and time format**. The date and time may wrap onto separate lines.
-- Click a search result to view its details. **Open Folder** opens the containing folder and selects the file when the desktop platform supports it.
-- Scan progress, **Cancel scan**, and **Exit File Index** appear in the top navigation area to the right of **Settings**.
+- 重複點選 **Filename / Relative Path**，會依序切換「只對檔名升冪」、「路徑加檔名升冪」、「只對檔名降冪」及「路徑加檔名降冪」。欄位上的 `F` 或 `P+F` 和箭頭會顯示目前模式。
+- 點選 **Storage**、**Size** 或 **Modified** 會先以升冪排序；再次點選同一欄位可切換升冪與降冪。
+- 檔案大小會自動使用 B、KB、MB、GB、TB 或 PB；畫面較窄時，數字與單位可能分行顯示。
+- 日期時間依 **Settings → Date and time format** 的設定顯示；必要時日期與時間會分行顯示。
+- 點選搜尋結果可查看詳細資料。按下 **Open Folder** 時，支援的平台會開啟所在資料夾並選取該檔案。
+- 掃描進度、**Cancel scan** 與 **Exit File Index** 位於頂部導覽列的 **Settings** 右側。
 
-## Development mode
+## 開發模式
 
-Development requires Go 1.22 or newer. Run these commands from the project directory containing `go.mod`:
+開發模式需要 Go 1.22 或更新版本，而且必須在包含 `go.mod` 的專案目錄執行：
 
 ```powershell
 go mod tidy
 go run .
 ```
 
-`go run .` uses the project directory as the portable root. For regular use, build a native executable as described below. A built application does not require Go and can be started outside the project directory.
+`go run .` 會以專案目錄作為 Portable Root。一般使用者建議使用下方說明建置原生執行檔；建置後不需要安裝 Go，也不需要從專案目錄啟動。
 
-The server listens only on `127.0.0.1`. It opens the default browser when configured to do so. If automatic browser launch is disabled, open the one-time session URL printed in the terminal.
+程式只監聽 `127.0.0.1`。啟動後會依設定開啟預設瀏覽器；若停用自動開啟，請使用終端機顯示的一次性 Session URL。
 
 ## Windows
 
-### Build
+### 建置
 
-Run in PowerShell:
+在 PowerShell 中執行：
 
 ```powershell
 go build -o FileIndex.exe .
 ```
 
-A successful `go build` normally prints no message. Confirm that `FileIndex.exe` was created in the project directory.
+`go build` 成功時通常不會顯示訊息；請確認專案目錄中已產生 `FileIndex.exe`。
 
-Start the application by double-clicking `FileIndex.exe` or from PowerShell:
+建置後可直接雙擊 `FileIndex.exe`，或從 PowerShell 執行：
 
 ```powershell
 .\FileIndex.exe
 ```
 
-You can also place a `Start-FileIndex.bat` file next to the executable:
+也可以在執行檔旁建立 `Start-FileIndex.bat`：
 
 ```bat
 @echo off
@@ -76,9 +76,9 @@ cd /d "%~dp0"
 start "" "%~dp0FileIndex.exe"
 ```
 
-Double-click the BAT file to start the application.
+之後雙擊 BAT 即可啟動。
 
-To run the development version from a BAT file, place this file in the project root:
+若要透過 BAT 執行開發版本，可使用：
 
 ```bat
 @echo off
@@ -87,28 +87,28 @@ go run .
 pause
 ```
 
-This development launcher still requires Go to be installed.
+這種方式仍需要安裝 Go，而且 BAT 必須放在專案根目錄。
 
-### Executable icon
+### 執行檔圖示
 
-The `image` directory contains [`FileIndex.ico`](image/FileIndex.ico) for Windows executable packaging and [`FileIndex-logo.png`](image/FileIndex-logo.png) as its high-resolution source. You can replace both files with your own artwork before packaging a release. Keep the same filenames if your build or packaging script refers to them. Replacing these files does not alter an already-built executable; rebuild or repackage the application after changing the icon.
+`image` 目錄中的 [`FileIndex.ico`](image/FileIndex.ico) 可供 Windows 執行檔封裝使用，[`FileIndex-logo.png`](image/FileIndex-logo.png) 則是高解析度來源圖。使用者可在封裝發行版本前，以自己的圖案替換這兩個檔案；若建置或封裝腳本引用這些檔名，請維持檔名不變。替換圖片不會直接修改已建置的執行檔，變更圖示後需重新建置或封裝。
 
 ## macOS
 
-### Build for the current Mac
+### 建置目前 Mac 的版本
 
 ```bash
 go build -o FileIndex .
 chmod +x FileIndex
 ```
 
-Start it with:
+啟動：
 
 ```bash
 ./FileIndex
 ```
 
-To launch it by double-clicking in Finder, create `start-fileindex.command` next to the executable:
+若要從 Finder 雙擊啟動，可在執行檔旁建立 `start-fileindex.command`：
 
 ```sh
 #!/bin/sh
@@ -116,23 +116,23 @@ cd "$(dirname "$0")"
 exec ./FileIndex
 ```
 
-Make the launcher executable:
+設定執行權限：
 
 ```bash
 chmod +x start-fileindex.command
 ```
 
-The first launch of an unsigned build may require approval under **System Settings → Privacy & Security**.
+第一次執行未簽章的程式時，可能需要在「系統設定 → 隱私權與安全性」中允許執行。
 
-### Build for a specific architecture
+### 指定架構
 
-Apple Silicon:
+Apple Silicon：
 
 ```bash
 GOOS=darwin GOARCH=arm64 go build -o FileIndex-macos-arm64 .
 ```
 
-Intel Mac:
+Intel Mac：
 
 ```bash
 GOOS=darwin GOARCH=amd64 go build -o FileIndex-macos-x64 .
@@ -140,20 +140,20 @@ GOOS=darwin GOARCH=amd64 go build -o FileIndex-macos-x64 .
 
 ## Linux
 
-### Build
+### 建置
 
 ```bash
 go build -o FileIndex .
 chmod +x FileIndex
 ```
 
-Start it with:
+啟動：
 
 ```bash
 ./FileIndex
 ```
 
-You can also create `start-fileindex.sh`:
+也可以建立 `start-fileindex.sh`：
 
 ```sh
 #!/bin/sh
@@ -161,30 +161,30 @@ cd "$(dirname "$0")"
 exec ./FileIndex
 ```
 
-Make it executable and run it:
+設定權限並啟動：
 
 ```bash
 chmod +x start-fileindex.sh
 ./start-fileindex.sh
 ```
 
-To launch the application from a desktop environment menu, create a `.desktop` file:
+如需從桌面環境的應用程式選單啟動，可建立 `.desktop` 檔：
 
 ```ini
 [Desktop Entry]
 Type=Application
 Name=File Index
-Exec=/absolute/path/to/FileIndex/FileIndex
-Path=/absolute/path/to/FileIndex
+Exec=/完整路徑/FileIndex/FileIndex
+Path=/完整路徑/FileIndex
 Terminal=false
 Categories=Utility;
 ```
 
-Replace `Exec` and `Path` with the actual absolute paths.
+請將 `Exec` 和 `Path` 改成實際絕對路徑。
 
-## Cross-compile from Windows
+## 從 Windows 交叉編譯
 
-Use PowerShell to build all supported targets:
+在 PowerShell 中可建置所有支援平台：
 
 ```powershell
 $env:GOOS="windows"; $env:GOARCH="amd64"; go build -o FileIndex-windows-x64.exe .
@@ -193,13 +193,13 @@ $env:GOOS="darwin";  $env:GOARCH="arm64"; go build -o FileIndex-macos-arm64 .
 $env:GOOS="darwin";  $env:GOARCH="amd64"; go build -o FileIndex-macos-x64 .
 ```
 
-## Portable directory
+## Portable 目錄
 
-A built executable uses its own directory as the portable root. The recommended layout is:
+建置後，程式以執行檔所在目錄作為 Portable Root。建議結構如下：
 
 ```text
 FileIndex/
-├── FileIndex.exe or FileIndex
+├── FileIndex.exe 或 FileIndex
 ├── config/
 │   └── config.json
 ├── data/
@@ -208,8 +208,8 @@ FileIndex/
 └── export/
 ```
 
-`database_path`, `backup_path`, and `export_path` must be relative to the portable root. The application can therefore be launched from a shortcut, BAT file, shell script, Finder, or an application menu while continuing to use the same data beside the executable.
+`database_path`、`backup_path` 與 `export_path` 必須是 Portable Root 下的相對路徑。因此可以從捷徑、BAT、Shell Script、Finder 或應用程式選單啟動，資料仍會放在執行檔旁的相同 Portable Root 中。
 
-## Remaining platform work
+## 尚待整合
 
-Native directory and database-file pickers and filesystem identity comparison remain platform-integration work. Validated path fields currently provide the corresponding workflows.
+原生目錄／資料庫檔案選擇器及 Filesystem identity 比對仍是後續的平台整合項目；目前以經過驗證的路徑欄位提供相同工作流程。
