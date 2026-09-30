@@ -275,6 +275,10 @@ func openDatabase(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	if err = enableAutoVacuum(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable automatic database space reclamation: %w", err)
+	}
 	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'staging_scan_%'")
 	if err != nil {
 		db.Close()
@@ -299,6 +303,34 @@ func openDatabase(path string) (*sql.DB, error) {
 	}
 	return db, nil
 }
+
+// Configure before serving requests, including when opening a restored database.
+// Existing NONE databases require a one-time rebuild to add pointer-map pages.
+func enableAutoVacuum(db *sql.DB) error {
+	var mode int
+	if err := db.QueryRow("PRAGMA auto_vacuum").Scan(&mode); err != nil {
+		return err
+	}
+	if mode == 1 {
+		return nil
+	}
+	if _, err := db.Exec("PRAGMA auto_vacuum = FULL"); err != nil {
+		return err
+	}
+	if mode == 0 {
+		if _, err := db.Exec("VACUUM"); err != nil {
+			return err
+		}
+	}
+	if err := db.QueryRow("PRAGMA auto_vacuum").Scan(&mode); err != nil {
+		return err
+	}
+	if mode != 1 {
+		return errors.New("database did not enable FULL auto_vacuum")
+	}
+	return nil
+}
+
 func migrate(db *sql.DB) error {
 	var version int
 	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
@@ -821,9 +853,24 @@ func (a *App) scans(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Mode = strings.ToLower(req.Mode)
 	req.Storage.Name = strings.TrimSpace(req.Storage.Name)
-	if (req.Mode != "new" && req.Mode != "rescan") || req.ScanRoot == "" || (req.Mode == "new" && req.Storage.Name == "") || (req.Mode == "rescan" && req.StorageID < 1) {
+	if (req.Mode != "new" && req.Mode != "rescan") || (req.Mode == "new" && (req.ScanRoot == "" || req.Storage.Name == "")) || (req.Mode == "rescan" && req.StorageID < 1) {
 		httpError(w, 400, "INVALID_REQUEST", "Required scan fields are missing", nil)
 		return
+	}
+	if req.Mode == "rescan" {
+		err := a.db.QueryRow("SELECT COALESCE(NULLIF(current_root,''),last_scan_root), name FROM storages WHERE id=?", req.StorageID).Scan(&req.ScanRoot, &req.Storage.Name)
+		if errors.Is(err, sql.ErrNoRows) {
+			httpError(w, 404, "STORAGE_NOT_FOUND", "Storage not found", nil)
+			return
+		}
+		if err != nil {
+			httpError(w, 500, "QUERY_FAILED", err.Error(), nil)
+			return
+		}
+		if st, err := os.Stat(req.ScanRoot); err != nil || !st.IsDir() {
+			httpError(w, 422, "STORAGE_OFFLINE", "Source directory is unavailable. Reconnect the storage or use Relocate before rescanning.", nil)
+			return
+		}
 	}
 	root, e := filepath.Abs(req.ScanRoot)
 	if e != nil {
@@ -834,17 +881,6 @@ func (a *App) scans(w http.ResponseWriter, r *http.Request) {
 	if st, e := os.Stat(req.ScanRoot); e != nil || !st.IsDir() {
 		httpError(w, 422, "DIRECTORY_NOT_FOUND", "Scan root is not a directory", nil)
 		return
-	}
-	if req.Mode == "rescan" {
-		var exists bool
-		if err := a.db.QueryRow("SELECT EXISTS(SELECT 1 FROM storages WHERE id=?)", req.StorageID).Scan(&exists); err != nil {
-			httpError(w, 500, "QUERY_FAILED", err.Error(), nil)
-			return
-		}
-		if !exists {
-			httpError(w, 404, "STORAGE_NOT_FOUND", "Storage not found", nil)
-			return
-		}
 	}
 	a.mu.Lock()
 	for _, j := range a.jobs {

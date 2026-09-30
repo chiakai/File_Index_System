@@ -13,7 +13,7 @@
 
 - Storage 資料欄位 `scan_root` 拆為 `last_scan_root` 與 `current_root`。
 - Open Folder 與即時可用性判斷使用 `current_root`。
-- Locate 僅修改 `current_root`，保留上次成功掃描的所有歷史資料。
+- Relocate 僅修改 `current_root`，保留上次成功掃描的所有歷史資料。
 - API 統一掛在 `/api/v1`；新增 Storage 透過首次 Scan 成功後建立，不另設 `POST /storages`。
 - CSV 編碼依最終技術基線採 UTF-8 + BOM。
 
@@ -85,7 +85,7 @@ File Index System 是個人使用、離線、跨平台、Portable 的檔案中�
 | macOS | ARM64 |
 | macOS | x64 |
 
-各平台共用原始碼、Web UI、Application Logic、SQLite Schema、`fileindex.db` 與 `config.json`；發布各自的原生執行檔。跨 OS 後來源掛載位置可能不同，透過 Locate 更新。
+各平台共用原始碼、Web UI、Application Logic、SQLite Schema、`fileindex.db` 與 `config.json`；發布各自的原生執行檔。跨 OS 後來源掛載位置可能不同，透過 Relocate 更新。
 
 此矩陣為發行目標，實際最低 OS 需求亦受所用 Go 工具鏈限制，不表示所有系統版本均已完成實機驗證。建置與圖示封裝規則見第 4.4～4.6 節。
 
@@ -205,7 +205,7 @@ python scripts/build.py --refresh-icons --target all
 
 一般建置不需 Pillow 或下載圖示工具；只有 `--refresh-icons` 用 Pillow 轉換 ICNS，並透過 Go 下載／執行固定版本 `github.com/akavel/rsrc@v0.10.2` 產生 Windows 資源。更新後須一併提交 SYSO 與 ICNS；替換來源圖片不會更新既有執行檔。檔案總管若快取舊圖示，可重新整理或將新版複製至其他資料夾確認。
 
-## 5. Storage 模型與 Locate
+## 5. Storage 模型與 Relocate
 
 ### 5.1 Storage 定義與辨識
 
@@ -218,19 +218,19 @@ Volume Label、Filesystem Type、Filesystem ID／UUID／Serial、Capacity 均是
 | 欄位 | 定義 | 更新時機 |
 |---|---|---|
 | `last_scan_root` | 最後成功建立索引所使用的 Root | Scan／Rescan 成功提交 |
-| `current_root` | 目前使用者指定的來源位置 | Scan／Rescan 成功提交或 Locate 成功 |
+| `current_root` | 目前使用者指定的來源位置 | Scan／Rescan 成功提交或 Relocate 成功 |
 
 ```text
 Windows 掃描成功：
 last_scan_root = E:\
 current_root   = E:\
 
-移至 macOS 並 Locate：
+移至 macOS 並 Relocate：
 last_scan_root = E:\
 current_root   = /Volumes/BACKUP_A
 ```
 
-### 5.3 Locate 流程
+### 5.3 Relocate 流程
 
 目前流程使用經驗證的路徑欄位；以下原生選擇器與 identity 差異確認為待整合設計，不應視為現有功能：
 
@@ -240,7 +240,7 @@ current_root   = /Volumes/BACKUP_A
 4. 使用者確認後可用 `confirm_mismatch: true` 繼續。
 5. 只更新 `current_root`，重新計算可用性。
 
-Locate 不掃描、不更動 files、不更新 `last_scan_root`、`last_scan_at`、`file_count`、`total_size_bytes`，也不覆寫上次掃描的 Volume／Filesystem／Capacity 資訊。
+Relocate 不掃描、不更動 files、不更新 `last_scan_root`、`last_scan_at`、`file_count`、`total_size_bytes`，也不覆寫上次掃描的 Volume／Filesystem／Capacity 資訊。
 
 ### 5.4 管理操作
 
@@ -255,6 +255,10 @@ Locate 不掃描、不更動 files、不更新 `last_scan_root`、`last_scan_at`
 Schema 版本固定為 `PRAGMA user_version = 1`。正式持久化資料表為 `storages`、`files`、`settings`，不建立 `directories` Table。staging 是暫存工作資料，不是第四個正式業務資料模型。
 
 ### 6.1 storages
+
+資料庫開啟並通過 Schema 驗證後，啟用 `PRAGMA auto_vacuum=FULL`。既有 NONE 模式資料庫先設定 FULL，再執行一次 `VACUUM` 完成轉換；INCREMENTAL 模式可直接切換，已是 FULL 則不重建。此規則亦適用還原後開啟的 DB，Schema 版本仍為 1。轉換失敗須回報錯誤，不可假裝已啟用。轉換需額外磁碟空間及時間，於開始接受請求前完成。
+
+刪除 Storage 的交易連動刪除 files，提交時自動回收完整空白頁面，不影響其他索引或來源檔案。未釋出完整頁面時不保證檔案大小減少；FULL 回收不等同全面消除碎片。發行驗證須涵蓋舊 DB 轉換、刪除後實際檔案縮小、其餘索引保留、完整性及重新開啟後設定持續有效。
 
 | Column | Type／Constraint | 說明 |
 |---|---|---|
@@ -354,7 +358,7 @@ Filename／Relative Path 表頭依序切換「檔名升冪 → 路徑加檔名�
 
 ## 8. File Details 與 Open Folder
 
-File Details 開啟時，Backend 依 `current_root` 計算來源可用性。可用時提供 Open Folder；未定位／離線時提供狀態說明與 Locate Storage 入口。
+File Details 開啟時，Backend 依 `current_root` 計算來源可用性。可用時提供 Open Folder；未定位／離線時提供狀態說明與 Relocate Storage 入口。
 
 Open Folder 開啟所在目錄，支援時選取索引檔案，但不啟動檔案內容：
 
@@ -391,7 +395,9 @@ UI 以 500 ms～1 秒間隔 polling，顯示 Current Directory、Files Scanned�
 
 ### 9.3 Rescan
 
-1. 指定既有 Storage 與掃描 Root。
+Rescan 直接使用 `current_root`；僅當此欄位未設定時才使用 `last_scan_root`。不顯示 Root path 表單，也不採用請求另傳的路徑；變更位置須先使用 Relocate。來源不可用時回 `422 STORAGE_OFFLINE`，提示重新連接或 Relocate，不建立掃描工作，保留原索引。介面名稱改為 Relocate，既有 `/storages/{id}/locate` API 路徑維持相容。
+
+1. 點選既有 Storage 的 Rescan，由 Backend 取得已保存的來源目錄。
 2. 驗證輸入路徑；Filesystem identity 比對及差異確認仍待平台整合。
 3. 保留舊索引，將新結果寫入獨立 staging。
 4. 掃描成功後，在單一交易中替換該 Storage 的 files，更新統計、Filesystem 資訊、`last_scan_at`、`last_scan_root`、`current_root`。
@@ -543,7 +549,7 @@ Settings API 讀取與保存上述設定。設定變更哪些即時生效、哪�
 └────────────────────────────────────────────────────────┘
 ```
 
-離線／未定位時顯示 `Offline / Not located` 與 Locate Storage 入口，保留全部索引資訊；不可提供看似可執行的 Open Folder。
+離線／未定位時顯示 `Offline / Not located` 與 Relocate Storage 入口，保留全部索引資訊；不可提供看似可執行的 Open Folder。
 
 ### 13.3 Storage 與工作流程
 
@@ -552,12 +558,12 @@ Storage                                              [Add]
 ──────────────────────────────────────────────────────────
 工程備份硬碟 A        ● Available / ○ Offline
 Filesystem / Capacity / Files / Indexed Size / Last Scan
-[View Files] [Details] [Edit] [Rescan] [Locate]
+[View Files] [Details] [Edit] [Rescan] [Relocate]
 [Export CSV] [Delete]
 
 Add → Select Directory → Inspect → Name / Description → Scan
-Rescan → 指定 Root → 驗證路徑 → Scan
-Locate → 指定 Current Root → 驗證路徑 → 更新位置
+Rescan → 讀取已保存 Root → 驗證路徑 → Scan
+Relocate → 指定 Current Root → 驗證路徑 → 更新位置
 ```
 
 原生路徑選擇器及 Filesystem identity 差異警告為後續整合項目。
@@ -598,7 +604,7 @@ Date and time format [locale ▼]
 | 狀態 | UI 行為 |
 |---|---|
 | Ready | 可正常操作 |
-| Offline／Not located | 可查索引；提供 Locate |
+| Offline／Not located | 可查索引；提供 Relocate |
 | Root 存在但目錄不存在 | 顯示 Directory Not Found |
 | Filesystem 資訊不一致（待整合） | 設計為顯示 previous／current 比較，讓使用者決定 |
 | Scan 進行中 | 顯示統計；第二個 Scan 回衝突 |
@@ -741,13 +747,11 @@ Rescan：
 ```json
 {
   "mode": "rescan",
-  "storage_id": 3,
-  "scan_root": "/Volumes/BACKUP_A",
-  "confirm_mismatch": false
+  "storage_id": 3
 }
 ```
 
-請求中的 `scan_root` 表示「這次要掃描的輸入路徑」，可保留此名稱；它不是被移除的 storages 資料欄位。成功提交後才寫入兩個正式 Root 欄位。
+新增 Storage 請求中的 `scan_root` 表示「這次要掃描的輸入路徑」，可保留此名稱；它不是被移除的 storages 資料欄位。成功提交後才寫入兩個正式 Root 欄位。
 
 建立 Job 回 `201`，data 包含 `job_id`、`status: running`。進度回傳：
 
@@ -769,7 +773,7 @@ Rescan：
 
 完成後回 `status: completed` 與 `storage_id`、最終統計；取消要求回 `cancelling`。
 
-### 14.6 Locate
+### 14.6 Relocate
 
 ```json
 {
@@ -838,7 +842,7 @@ Rescan：
 - 前端不得直接操作 DB 或 OS Command。
 - Open Folder 只接受 File ID，由 Backend 解析路徑。
 - 刪除備份只接受安全 Backup ID，不接受任意刪除路徑。
-- Inspect、Scan、Locate、Restore 因用途需要可提交來源 path，但均由 Backend 驗證，不能因此泛化為任意 OS 執行介面。
+- Inspect、Scan、Relocate、Restore 因用途需要可提交來源 path，但均由 Backend 驗證，不能因此泛化為任意 OS 執行介面。
 
 ### 15.2 安全實作補充（非原對話逐項定案）
 
@@ -872,8 +876,8 @@ Go 的 goroutine／channel 用於維持 HTTP UI 與長時間工作的回應能�
 | A04 | Rescan 成功 | 單一交易替換索引與掃描資訊 |
 | A05 | Scan 進行中再要求 Scan | 回狀態衝突，不建立第二個工作 |
 | A06 | 拔除 Storage 後搜尋 | 仍可取得索引與 File Details |
-| A07 | Windows 掃描後移至 macOS Locate | 只改 current_root，不重新掃描 |
-| A08 | Locate 前後比對資料 | files、last_scan_at、統計與 Filesystem 歷史資訊不變 |
+| A07 | Windows 掃描後移至 macOS Relocate | 只改 current_root，不重新掃描 |
+| A08 | Relocate 前後比對資料 | files、last_scan_at、統計與 Filesystem 歷史資訊不變 |
 | A09 | 多關鍵字分散在檔名及目錄 | 每個詞都符合時才返回 |
 | A10 | 結果有多頁後匯出 | CSV 含全部符合結果 |
 | A11 | Root 可用且目錄存在 | Open Folder 開目錄，不開檔案 |
@@ -902,7 +906,7 @@ README 明確列出的待整合項目為原生目錄／資料庫檔案選擇器�
 3. **掃描規則**：符號連結、junction、隱藏／系統檔、排除規則、特殊檔案、跨掛載點、非法或無法轉換的檔名。
 4. **Search 細節**：大小寫與 Unicode 比對、空白詞拆分、空查詢、`%`／`_` literal 語意、穩定次排序、NULL 排序、頁數上限；排序模式與 enum 已同步至第 7、14 節。
 5. **檔案欄位正規化**：副檔名大小寫、無副檔名的 NULL／空字串政策、同一路徑唯一性與 Rescan 後 File ID 穩定性。
-6. **staging 實作與互斥**：暫存 DB 或其他形式、崩潰後清理、Scan 與 Delete／Locate／Restore／Export 等同時操作的規則。
+6. **staging 實作與互斥**：暫存 DB 或其他形式、崩潰後清理、Scan 與 Delete／Relocate／Restore／Export 等同時操作的規則。
 7. **Restore 失敗復原**：自動備份失敗時的阻擋、替換方式、重新開啟失敗時回復、版本不相容處理；不得自行假設已有 Migration。
 8. **CSV 完整契約**：換行格式、NULL 表示、公式型文字處理、同名檔案處理與下載／開啟匯出檔的 UI 交付方式。
 9. **Settings 生效時機**：即時／重啟項目、驗證範圍、設定損壞處理、DB 路徑變更語意。

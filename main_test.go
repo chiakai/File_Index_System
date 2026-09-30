@@ -5,10 +5,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
+	"fmt"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExecutableRoot(t *testing.T) {
@@ -92,6 +95,204 @@ func TestMigrateRejectsNewerSchema(t *testing.T) {
 	if err := migrate(db); err == nil {
 		t.Fatal("expected newer schema to be rejected")
 	}
+}
+
+func TestRescanUsesStoredRoot(t *testing.T) {
+	for _, fallback := range []bool{false, true} {
+		t.Run(fmt.Sprintf("fallback=%v", fallback), func(t *testing.T) {
+			app := testApp(t)
+			root := filepath.Join(app.root, "source")
+			if err := os.WriteFile(filepath.Join(root, "new.txt"), []byte("new"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			current, last := root, "missing-old-root"
+			if fallback {
+				current, last = "", root
+			}
+			result, err := app.db.Exec("INSERT INTO storages(name,last_scan_root,current_root,created_at) VALUES(?,?,?,?)", "archive", last, current, now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			id, _ := result.LastInsertId()
+			w := httptest.NewRecorder()
+			app.scans(w, httptest.NewRequest("POST", "/scans", strings.NewReader(fmt.Sprintf(`{"mode":"rescan","storage_id":%d}`, id))))
+			if w.Code != 201 {
+				t.Fatalf("%d: %s", w.Code, w.Body.String())
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				app.mu.RLock()
+				var status string
+				for _, job := range app.jobs {
+					status = job.Status
+				}
+				app.mu.RUnlock()
+				if status == "completed" {
+					break
+				}
+				if status == "failed" || time.Now().After(deadline) {
+					t.Fatalf("scan status: %s", status)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			var name, savedRoot string
+			if err := app.db.QueryRow("SELECT name FROM files WHERE storage_id=?", id).Scan(&name); err != nil {
+				t.Fatal(err)
+			}
+			if err := app.db.QueryRow("SELECT last_scan_root FROM storages WHERE id=?", id).Scan(&savedRoot); err != nil {
+				t.Fatal(err)
+			}
+			if name != "new.txt" || savedRoot != root {
+				t.Fatalf("indexed %q at %q", name, savedRoot)
+			}
+		})
+	}
+}
+
+func TestRescanOfflineDoesNotUseSuppliedOrHistoricalRoot(t *testing.T) {
+	app := testApp(t)
+	root := filepath.Join(app.root, "source")
+	result, err := app.db.Exec("INSERT INTO storages(name,last_scan_root,current_root,created_at) VALUES(?,?,?,?)", "archive", root, filepath.Join(root, "missing"), now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, _ := result.LastInsertId()
+	if _, err := app.db.Exec("INSERT INTO files(storage_id,name,relative_path,size_bytes) VALUES(?,?,?,?)", id, "old.txt", "", 10); err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	app.scans(w, httptest.NewRequest("POST", "/scans", strings.NewReader(fmt.Sprintf(`{"mode":"rescan","storage_id":%d,"scan_root":"."}`, id))))
+	if w.Code != 422 || !strings.Contains(w.Body.String(), "STORAGE_OFFLINE") || len(app.jobs) != 0 {
+		t.Fatalf("%d: %s", w.Code, w.Body.String())
+	}
+	var name string
+	if err := app.db.QueryRow("SELECT name FROM files WHERE storage_id=?", id).Scan(&name); err != nil || name != "old.txt" {
+		t.Fatalf("index changed: %q %v", name, err)
+	}
+}
+
+func TestDeleteStorageCascadesOnlyItsIndex(t *testing.T) {
+	app := testApp(t)
+	source := filepath.Join(app.root, "source", "keep.txt")
+	if err := os.WriteFile(source, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	for _, name := range []string{"remove", "keep"} {
+		result, err := app.db.Exec("INSERT INTO storages(name,last_scan_root,created_at) VALUES(?,?,?)", name, filepath.Dir(source), now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := result.LastInsertId()
+		ids = append(ids, id)
+		if _, err := app.db.Exec("INSERT INTO files(storage_id,name,relative_path,size_bytes) VALUES(?,?,?,?)", id, "keep.txt", "", 4); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w := httptest.NewRecorder()
+	app.storageRoute(w, httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/storages/%d", ids[0]), nil))
+	if w.Code != 200 {
+		t.Fatalf("%d: %s", w.Code, w.Body.String())
+	}
+	for _, table := range []string{"storages", "files"} {
+		column := "storage_id"
+		if table == "storages" {
+			column = "id"
+		}
+		for i, id := range ids {
+			var count int
+			if err := app.db.QueryRow("SELECT COUNT(*) FROM "+table+" WHERE "+column+"=?", id).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if count != i {
+				t.Fatalf("%s for %d: got %d, want %d", table, id, count, i)
+			}
+		}
+	}
+	if content, err := os.ReadFile(source); err != nil || string(content) != "keep" {
+		t.Fatalf("source changed: %q %v", content, err)
+	}
+}
+
+func TestStorageDeleteShrinksExistingDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer legacy.Close()
+	if _, err := legacy.Exec("PRAGMA auto_vacuum=NONE"); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(legacy); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := legacy.Exec("INSERT INTO storages(id,name,last_scan_root,created_at) VALUES(1,'remove','root','today'),(2,'keep','root','today')"); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := legacy.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 1000; i++ {
+		if _, err := tx.Exec("INSERT INTO files(storage_id,name,relative_path,size_bytes) VALUES(1,?,?,1)", fmt.Sprintf("file-%d", i), strings.Repeat("x", 1024)); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		}
+	}
+	if _, err := tx.Exec("INSERT INTO files(storage_id,name,relative_path,size_bytes) VALUES(2,'keep.txt','',4)"); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err := openDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := &App{db: db}
+	w := httptest.NewRecorder()
+	app.storageRoute(w, httptest.NewRequest("DELETE", "/api/v1/storages/1", nil))
+	if w.Code != 200 {
+		t.Fatalf("delete: %d %s", w.Code, w.Body.String())
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Size() >= before.Size() {
+		t.Fatalf("database did not shrink: %d -> %d", before.Size(), after.Size())
+	}
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM files WHERE storage_id=2 AND name='keep.txt'").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("remaining index: %d %v", count, err)
+	}
+	var check string
+	if err := db.QueryRow("PRAGMA integrity_check").Scan(&check); err != nil || check != "ok" {
+		t.Fatalf("integrity: %s %v", check, err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err = openDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var mode int
+	if err := db.QueryRow("PRAGMA auto_vacuum").Scan(&mode); err != nil || mode != 1 {
+		t.Fatalf("persistent auto_vacuum: %d %v", mode, err)
+	}
+	t.Logf("database shrank from %d to %d bytes", before.Size(), after.Size())
 }
 
 func TestCancelledRescanPreservesIndex(t *testing.T) {

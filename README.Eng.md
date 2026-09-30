@@ -37,6 +37,16 @@ File Index System is a portable, offline file metadata indexer based on the V1 s
 - Click a search result to view its details. **Open Folder** opens the containing folder and selects the file when the desktop platform supports it.
 - Scan progress, **Cancel scan**, and **Exit File Index** appear in the top navigation area to the right of **Settings**.
 
+**Rescan** immediately scans the stored current source directory and updates its index without asking for a Root path. After **Relocate**, it scans the new location. If the source is unavailable, reconnect it or relocate it first. **Relocate** changes only the source location without scanning or changing the existing file index.
+
+After **Exit File Index** successfully requests shutdown, the status changes to `Stopping server…`, then to `Server stopped` when the service disconnects, and the controls are disabled. If a scan is running, you are first asked whether to cancel it and exit; declining keeps the application available. Closing the browser tab alone does not stop the background program.
+
+### Deleting Storage and reclaiming database space
+
+Deleting a Storage also deletes its file index. SQLite `auto_vacuum=FULL` reclaims free pages at commit to shrink the database without deleting source files. Small deletions may not free a whole page, so the file size can stay unchanged. Existing databases (including restored databases) are converted on first opening, which may take time and extra disk space; subsequent openings do not rebuild the whole database.
+
+Only the selected Storage and its index are deleted; other Storages remain intact. Existing backups retain their original indexes, so restoring an older backup may bring back a deleted Storage.
+
 ## Development mode
 
 Development requires Go 1.22 or newer. Run these commands from the project directory containing `go.mod`:
