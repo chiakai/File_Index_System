@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>File Index — 使用說明</title>
+<style>
+body{margin:0;background:#f5f7f8;color:#17212b;font:16px/1.8 system-ui,sans-serif}main{max-width:900px;margin:auto;padding:32px 24px 64px}a{color:#0e7490}h1{font-size:30px}h2{margin-top:40px}h3{margin-bottom:6px}section{background:white;padding:20px 28px;margin-top:20px;border:1px solid #d9e0e6;border-radius:10px}dt{font-weight:700;margin-top:20px}dd{margin:4px 0 16px}code{overflow-wrap:anywhere}nav{display:flex;gap:20px;flex-wrap:wrap}li{margin:8px 0}:target{scroll-margin-top:20px}
+</style>
+</head>
+<body><main>
+<h1>File Index 使用說明</h1>
+<p>離線檔案索引工具：保存檔名、路徑、大小及修改時間，來源磁碟拔除後仍可搜尋。</p>
+<nav aria-label="說明目錄"><a href="#usage">使用說明</a><a href="#fields">設定欄位說明</a><a href="#storage-fields">Storage 欄位說明</a></nav>
+<section id="usage"><h2>使用說明</h2>
+<h3>建立與搜尋索引</h3>
+<ol><li>在 Storage 按 Add storage，輸入來源目錄、名稱及備註，再按 Start scan。</li><li>掃描完成後，切換至 Search 輸入檔名或路徑關鍵字。多個詞以 AND 比對，也可選擇 Storage 或副檔名篩選。</li><li>初次開啟時結果為空；按 Search 執行查詢。空白關鍵字可列出符合篩選的全部索引。View files 可直接查看指定 Storage。</li><li>點選結果查看詳細資訊；Open folder 在支援的平台開啟來源目錄並選取檔案，來源需已連接。</li></ol>
+<p>Filename / Relative Path 表頭依序切換檔名升冪、路徑加檔名升冪、檔名降冪、路徑加檔名降冪；Storage、Size、Modified 可切換升降冪。</p>
+<h3>維護 Storage</h3>
+<ul><li><strong>Rescan：</strong>直接掃描目前保存的來源位置並更新索引，不需再輸入路徑。取消或失敗時保留舊索引。</li><li><strong>Relocate：</strong>磁碟代號或目錄位置改變時指定新位置；不搬移檔案、不重新掃描。</li><li><strong>Delete：</strong>刪除選取的 Storage 與其檔案索引，不刪除來源檔案。資料庫會回收完整空白頁面；少量刪除可能不改變檔案大小。</li><li><strong>Export CSV：</strong>匯出符合搜尋条件的全部結果或指定 Storage，以 UTF-8 BOM 輸出，不受當頁筆數限制。</li></ul>
+<h3>備份與結束</h3>
+<p>Backup 可建立備份或還原。還原會完整取代目前資料庫，並先建立安全備份；舊備份可能包含已刪除的 Storage。</p>
+<p>使用 Exit File Index 結束程式；正在掃描時可確認取消並離開。狀態由 Stopping server… 變為 Server stopped 後可關閉分頁。只關閉瀏覽器不會停止程式。拔除隨身碟前請先結束程式。</p>
+<p>Exit File Index 在服務停止後會嘗試自動關閉目前分頁；若瀏覽器禁止自動關閉，會保留 Server stopped 提示，請手動關閉。其他分頁不受影響。</p>
+</section>
+<section id="fields"><h2>設定欄位說明</h2>
+<p>修改後按 Save settings 保存。路徑以程式所在資料夾為基準；macOS 為 FileIndex.app 旁，開發模式為專案根目錄。三個路徑必須是此目錄內的相對路徑，不能使用絕對路徑或跳到上層。</p>
+<dl>
+<dt id="database-path">Database path</dt><dd>SQLite 索引資料庫位置，預設 <code>data/fileindex.db</code>。修改後重新啟動才切換資料庫，不會自動搬移原資料；若要保留索引，請先備份並妥善搬移或還原。</dd>
+<dt id="backup-path">Backup path</dt><dd>備份存放目錄，預設 <code>backup</code>。保存後後續備份使用新目錄，舊備份不會自動搬移。</dd>
+<dt id="export-path">Export path</dt><dd>CSV 匯出目錄，預設 <code>export</code>。保存後後續匯出使用新目錄，既有匯出檔不會自動搬移。</dd>
+<dt id="search-page-size">Search page size</dt><dd>每頁搜尋筆數，範圍 1～1000，預設 100。影響後續搜尋，不限制 CSV 匯出的總筆數。</dd>
+<dt id="http-port">HTTP port</dt><dd>本機網頁服務的連接埠，範圍 0～65535；0 表示自動選擇可用連接埠。修改後重新啟動生效；指定的埠若被占用可能無法啟動。</dd>
+<dt id="auto-open-browser">Auto open browser</dt><dd>下次啟動時是否自動開啟預設瀏覽器。選 No 時需使用終端機提供的 Session URL；沒有主控台視窗的版本建議保持 Yes。</dd>
+<dt id="time-format">Date and time format</dt><dd>介面的日期與時間格式：System locale 使用系統格式；其他選項提供年/月/日或日/月/年順序，以及 12／24 小時制。保存後更新顯示，不改變資料庫中的時間紀錄。</dd>
+</dl></section>
+<section id="storage-fields"><h2>Storage 欄位說明</h2><dl>
+<dt>Last scan root</dt><dd>上次成功掃描使用的來源目錄。</dd>
+<dt>Current root</dt><dd>目前來源位置；Relocate 更新此欄位，Rescan 與 Open folder 使用此位置。</dd>
+<dt>Filesystem</dt><dd>上次成功掃描取得的檔案系統，例如 NTFS、exFAT 或 APFS；可取得時另顯示識別資訊。舊索引可 Rescan 補齊，無法取得時顯示 Unavailable。</dd>
+<dt>Capacity</dt><dd>上次掃描時，來源所在磁碟區的總容量，不是已索引檔案大小或剩餘空間。掃描子目錄也顯示所在磁碟區容量；Windows 配額可能影響回報值。無法取得時顯示 Unavailable。</dd>
+<dt>Last scan</dt><dd>上次成功完成掃描的時間。Relocate 不更新此時間或上次掃描的磁碟資訊。</dd>
+</dl></section>
+</main></body></html>

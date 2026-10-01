@@ -398,6 +398,15 @@ func (a *App) auth(next http.Handler) http.Handler {
 }
 func (a *App) routes(m *http.ServeMux) {
 	m.HandleFunc("/", a.index)
+	m.HandleFunc("/web/help.html", func(w http.ResponseWriter, r *http.Request) {
+		b, err := webFS.ReadFile("web/help.html")
+		if err != nil {
+			http.Error(w, "Help unavailable", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeContent(w, r, "help.html", time.Time{}, strings.NewReader(string(b)))
+	})
 	m.HandleFunc("/api/v1/system/status", a.status)
 	m.HandleFunc("/api/v1/system/shutdown", a.shutdown)
 	m.Handle("/api/v1/files/search", a.dbAccess(http.HandlerFunc(a.search)))
@@ -1019,6 +1028,11 @@ func (a *App) runScan(ctx context.Context, j *Job, req scanRequest) {
 		a.finish(j, "cancelled", nil)
 		return
 	default:
+	}
+	volume := readVolumeInfo(j.Root)
+	if _, err = tx.Exec("UPDATE storages SET volume_label=?,filesystem_type=?,filesystem_id=?,capacity_bytes=? WHERE id=?", volume.Label, volume.Filesystem, volume.ID, volume.Capacity, sid); err != nil {
+		a.finish(j, "failed", err)
+		return
 	}
 	_, err = tx.Exec("INSERT INTO files(storage_id,name,extension,relative_path,size_bytes,modified_at) SELECT ?,name,extension,relative_path,size_bytes,modified_at FROM "+table, sid)
 	if err != nil {

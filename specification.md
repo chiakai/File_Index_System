@@ -350,6 +350,8 @@ V1 不提供 OR、NOT、Regex 或複雜布林語法。
 
 ### 7.3 結果與 Details
 
+Search 初次啟動不自動查詢全部索引，結果保持空白並停用分頁，待使用者搜尋、篩選或 View files 後顯示。Storage Details 的欄位標題使用粗體；Filesystem 與 Capacity 由成功 Scan／Rescan 記錄，舊索引需重新掃描補齊。Capacity 是所在磁碟區總容量（Windows 可能受配額限制），不是目錄大小或剩餘空間；缺值顯示 Unavailable。此資訊讀取不代表已實作 Filesystem identity 自動比對。
+
 結果列顯示 Filename／Relative Path、Storage、Size、Modified。點擊整筆結果開啟 File Details，顯示 Filename、Storage、Relative Path、Size、Modified、Storage Last Scan 及 Source 狀態。
 
 Filename／Relative Path 表頭依序切換「檔名升冪 → 路徑加檔名升冪 → 檔名降冪 → 路徑加檔名降冪」，以 `F`／`P+F` 與箭頭表示模式。Storage、Size、Modified 首次點擊升冪，再次點擊切換降冪。大小自動使用 B、KB、MB、GB、TB、PB；窄畫面可將數字與單位分行。日期時間依 Settings → Date and time format 顯示，必要時日期與時間分行；不改變 DB／API 的 UTC 格式。

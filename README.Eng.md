@@ -30,6 +30,12 @@ File Index System is a portable, offline file metadata indexer based on the V1 s
 
 ## Using the interface
 
+- The three-line introduction appears at the bottom right of the page, leaving the Search workspace for filters and results.
+- **Help / 使用說明** at the bottom of **Settings** provides tab-styled links to the user guide, settings field reference, and Storage field reference. Each opens in a new tab. The help content is currently in Traditional Chinese and is bundled with the application for offline access.
+
+- Search starts with no results. Use Search, a filter, or View files to display indexed files.
+- Storage Details uses bold field labels. Filesystem and Capacity are recorded after a successful Scan/Rescan; rescan older indexes to populate them. Capacity is the containing volume's total capacity, not folder size or free space; Windows quotas may affect the reported capacity. Missing values display Unavailable. Relocate preserves the previous scan's volume information.
+
 - Click **Filename / Relative Path** repeatedly to cycle through filename ascending, path plus filename ascending, filename descending, and path plus filename descending. The `F` or `P+F` marker and arrow show the active mode.
 - Click **Storage**, **Size**, or **Modified** to sort ascending; click the same heading again to switch between ascending and descending.
 - File sizes automatically use B, KB, MB, GB, TB, or PB. The number and unit may wrap separately on narrow screens.
@@ -40,6 +46,8 @@ File Index System is a portable, offline file metadata indexer based on the V1 s
 **Rescan** immediately scans the stored current source directory and updates its index without asking for a Root path. After **Relocate**, it scans the new location. If the source is unavailable, reconnect it or relocate it first. **Relocate** changes only the source location without scanning or changing the existing file index.
 
 After **Exit File Index** successfully requests shutdown, the status changes to `Stopping server…`, then to `Server stopped` when the service disconnects, and the controls are disabled. If a scan is running, you are first asked whether to cancel it and exit; declining keeps the application available. Closing the browser tab alone does not stop the background program.
+
+Exit File Index attempts to close the current tab after the service stops. If the browser blocks automatic closing, the Server stopped message remains visible; close the tab manually. Other tabs are unaffected.
 
 ### Deleting Storage and reclaiming database space
 
@@ -77,27 +85,6 @@ Start the application by double-clicking `FileIndex.exe` or from PowerShell:
 ```powershell
 .\FileIndex.exe
 ```
-
-You can also place a `Start-FileIndex.bat` file next to the executable:
-
-```bat
-@echo off
-cd /d "%~dp0"
-start "" "%~dp0FileIndex.exe"
-```
-
-Double-click the BAT file to start the application.
-
-To run the development version from a BAT file, place this file in the project root:
-
-```bat
-@echo off
-cd /d "%~dp0"
-go run .
-pause
-```
-
-This development launcher still requires Go to be installed.
 
 ### Executable icon
 
@@ -172,7 +159,7 @@ FileIndex/
 └── export/
 ```
 
-`database_path`, `backup_path`, and `export_path` must be relative to the portable root. The application can therefore be launched from a shortcut, BAT file, shell script, Finder, or an application menu while continuing to use the same data beside the executable.
+`database_path`, `backup_path`, and `export_path` must be relative to the portable root. The application can therefore be launched from a shortcut, shell script, Finder, or an application menu while continuing to use the same data beside the executable.
 
 ## Remaining platform work
 

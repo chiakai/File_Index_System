@@ -30,6 +30,12 @@ File Index System 是依照 V1 規格開發的可攜式離線檔案中繼資料�
 
 ## 介面操作
 
+- 介紹文字以三列顯示在頁面底部右側，Search 工作區直接呈現搜尋條件與結果。
+- **Settings** 最下方的 **Help / 使用說明** 提供「使用說明」、「設定欄位說明」與「Storage 欄位說明」連結，以分頁按鈕樣式呈現。點選後另開分頁；說明內建於程式，不需要網際網路。
+
+- Search 初次開啟時不自動列出全部索引；按下 Search、選擇篩選條件或使用 View files 後才顯示結果。
+- Storage Details 的欄位標題以粗體顯示。Filesystem 與 Capacity 在成功 Scan／Rescan 時記錄；舊索引請 Rescan 一次補齊。Capacity 是來源目錄所在磁碟區的總容量，不是目錄大小或剩餘空間；Windows 配額可能影響回報容量。無法取得時顯示 Unavailable。Relocate 不修改上次掃描的磁碟資訊。
+
 - 重複點選 **Filename / Relative Path**，會依序切換「只對檔名升冪」、「路徑加檔名升冪」、「只對檔名降冪」及「路徑加檔名降冪」。欄位上的 `F` 或 `P+F` 和箭頭會顯示目前模式。
 - 點選 **Storage**、**Size** 或 **Modified** 會先以升冪排序；再次點選同一欄位可切換升冪與降冪。
 - 檔案大小會自動使用 B、KB、MB、GB、TB 或 PB；畫面較窄時，數字與單位可能分行顯示。
@@ -40,6 +46,8 @@ File Index System 是依照 V1 規格開發的可攜式離線檔案中繼資料�
 **Rescan** 直接重新掃描 Storage 目前的來源目錄並更新索引，不需輸入 Root path。若已使用 **Relocate** 指定新位置，會掃描新位置；來源不可用時，請先重新連接或重新定位。**Relocate** 只更新來源位置，不掃描或修改既有檔案索引。
 
 按下 **Exit File Index** 並成功送出結束要求後，狀態會顯示 `Stopping server…`，服務停止連線後改為 `Server stopped`，並停用操作控制。若正在掃描，會先詢問是否取消掃描並結束；取消結束操作時仍可繼續使用。只關閉瀏覽器分頁不會結束背景程式。
+
+Exit File Index 在服務停止後會嘗試關閉目前分頁。若瀏覽器不允許自動關閉，會保留 Server stopped 提示，請手動關閉；其他分頁不受影響。
 
 ### 刪除 Storage 與資料庫空間
 
@@ -77,27 +85,6 @@ go build -o FileIndex.exe .
 ```powershell
 .\FileIndex.exe
 ```
-
-也可以在執行檔旁建立 `Start-FileIndex.bat`：
-
-```bat
-@echo off
-cd /d "%~dp0"
-start "" "%~dp0FileIndex.exe"
-```
-
-之後雙擊 BAT 即可啟動。
-
-若要透過 BAT 執行開發版本，可使用：
-
-```bat
-@echo off
-cd /d "%~dp0"
-go run .
-pause
-```
-
-這種方式仍需要安裝 Go，而且 BAT 必須放在專案根目錄。
 
 ### 執行檔圖示
 
@@ -172,7 +159,7 @@ FileIndex/
 └── export/
 ```
 
-`database_path`、`backup_path` 與 `export_path` 必須是 Portable Root 下的相對路徑。因此可以從捷徑、BAT、Shell Script、Finder 或應用程式選單啟動，資料仍會放在執行檔旁的相同 Portable Root 中。
+`database_path`、`backup_path` 與 `export_path` 必須是 Portable Root 下的相對路徑。因此可以從捷徑、Shell Script、Finder 或應用程式選單啟動，資料仍會放在執行檔旁的相同 Portable Root 中。
 
 ## 尚待整合
 
