@@ -752,20 +752,27 @@ func (a *App) openFolder(w http.ResponseWriter, id int64) {
 		httpError(w, 422, "FILE_NOT_FOUND_ON_SOURCE", "The indexed file no longer exists at the current location", nil)
 		return
 	}
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("explorer.exe", "/select,"+target)
-	} else if runtime.GOOS == "darwin" {
-		cmd = exec.Command("open", "-R", target)
-	} else {
-		uri := (&url.URL{Scheme: "file", Path: filepath.ToSlash(target)}).String()
-		cmd = exec.Command("dbus-send", "--session", "--dest=org.freedesktop.FileManager1", "--type=method_call", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowItems", "array:string:"+uri, "string:")
-	}
+	cmd := fileManagerCommand(runtime.GOOS, target)
 	if err = cmd.Start(); err != nil {
 		httpError(w, 500, "OPEN_FOLDER_FAILED", err.Error(), nil)
 		return
 	}
 	jsonWrite(w, 200, map[string]bool{"opened": true, "selected": true})
+}
+
+func fileManagerCommand(platform, target string) *exec.Cmd {
+	switch platform {
+	case "windows":
+		// Explorer documents /select, as a switch followed by the object path.
+		// Keeping the path in its own argument lets Go quote spaces, commas and
+		// non-ASCII filenames without Explorer treating them as switch text.
+		return exec.Command("explorer.exe", "/select,", target)
+	case "darwin":
+		return exec.Command("open", "-R", target)
+	default:
+		uri := (&url.URL{Scheme: "file", Path: filepath.ToSlash(target)}).String()
+		return exec.Command("dbus-send", "--session", "--dest=org.freedesktop.FileManager1", "--type=method_call", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowItems", "array:string:"+uri, "string:")
+	}
 }
 
 func (a *App) storageRoute(w http.ResponseWriter, r *http.Request) {

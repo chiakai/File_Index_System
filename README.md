@@ -41,6 +41,8 @@ File Index System 是依照 V1 規格開發的可攜式離線檔案中繼資料�
 - 檔案大小會自動使用 B、KB、MB、GB、TB 或 PB；畫面較窄時，數字與單位可能分行顯示。
 - 日期時間依 **Settings → Date and time format** 的設定顯示；必要時日期與時間會分行顯示。
 - 點選搜尋結果可查看詳細資料。按下 **Open Folder** 時，支援的平台會開啟所在資料夾並選取該檔案。
+- File details 的 **Relative path** 是相對於 Storage 掃描根目錄的資料夾路徑，不包含檔名；檔案直接位於根目錄時顯示 `(Storage root)`。
+- Windows 的 **Open Folder** 會將選取參數與完整檔案路徑分開傳給檔案總管，PDF、文字檔、Office 文件、圖片及無副檔名檔案共用相同流程，並支援路徑中的空白、逗號與中文。
 - 掃描進度、**Cancel scan** 與 **Exit File Index** 位於頂部導覽列的 **Settings** 右側。
 
 **Rescan** 直接重新掃描 Storage 目前的來源目錄並更新索引，不需輸入 Root path。若已使用 **Relocate** 指定新位置，會掃描新位置；來源不可用時，請先重新連接或重新定位。**Relocate** 只更新來源位置，不掃描或修改既有檔案索引。

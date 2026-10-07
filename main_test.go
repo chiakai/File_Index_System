@@ -83,6 +83,35 @@ func TestFileOrderModes(t *testing.T) {
 	}
 }
 
+func TestWindowsOpenFolderArgumentsAreExtensionIndependent(t *testing.T) {
+	root := `D:\Indexed files, archive`
+	for _, name := range []string{
+		`manual.pdf`,
+		`notes.txt`,
+		`document.docx`,
+		`image.jpg`,
+		`no-extension`,
+		`中文 檔案,版本 2.pdf`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			target := filepath.Join(root, name)
+			cmd := fileManagerCommand("windows", target)
+			if cmd.Path != "explorer.exe" && filepath.Base(cmd.Path) != "explorer.exe" {
+				t.Fatalf("unexpected command path: %q", cmd.Path)
+			}
+			want := []string{"explorer.exe", "/select,", target}
+			if len(cmd.Args) != len(want) {
+				t.Fatalf("args = %#v; want %#v", cmd.Args, want)
+			}
+			for i := range want {
+				if cmd.Args[i] != want[i] {
+					t.Fatalf("args = %#v; want %#v", cmd.Args, want)
+				}
+			}
+		})
+	}
+}
+
 func TestMigrateRejectsNewerSchema(t *testing.T) {
 	db, err := openDatabase(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
