@@ -14,7 +14,7 @@ body{margin:0;background:#f5f7f8;color:#17212b;font:16px/1.8 system-ui,sans-seri
 <section id="usage"><h2>使用說明</h2>
 <h3>建立與搜尋索引</h3>
 <p>File details 的 Relative path 只顯示檔案相對於掃描來源的目錄，不包含檔名；檔案若直接位於來源根目錄，會顯示 <strong>(Storage root)</strong>。</p>
-<ol><li>在 Storage 按 Add storage，輸入來源目錄、名稱及備註，再按 Start scan。</li><li>掃描完成後，切換至 Search 輸入檔名或路徑關鍵字。多個詞以 AND 比對，也可選擇 Storage 或副檔名篩選。</li><li>初次開啟時結果為空；按 Search 執行查詢。空白關鍵字可列出符合篩選的全部索引。View files 可直接查看指定 Storage。</li><li>點選結果查看詳細資訊；Open folder 在支援的平台開啟來源目錄並選取檔案，來源需已連接。</li></ol>
+<ol><li>在 Storage 按 Add storage，輸入來源目錄、名稱及備註，再按 Start scan。</li><li>掃描完成後，切換至 Search 輸入檔名或路徑關鍵字。多個詞以 AND 比對，也可選擇 Storage 或副檔名篩選。</li><li>初次開啟時結果為空；按 Search 執行查詢。空白關鍵字可列出符合篩選的全部索引。View files 可直接查看指定 Storage。</li><li>點選結果查看詳細資訊；Open folder 在支援的平台開啟來源目錄並選取檔案；Open File 使用作業系統的預設程式開啟檔案。兩者都要求來源已連接且檔案仍存在。</li></ol>
 <p>Filename / Relative Path 表頭依序切換檔名升冪、路徑加檔名升冪、檔名降冪、路徑加檔名降冪；Storage、Size、Modified 可切換升降冪。</p>
 <h3>維護 Storage</h3>
 <ul><li><strong>Rescan：</strong>直接掃描目前保存的來源位置並更新索引，不需再輸入路徑。取消或失敗時保留舊索引。</li><li><strong>Relocate：</strong>磁碟代號或目錄位置改變時指定新位置；不搬移檔案、不重新掃描。</li><li><strong>Delete：</strong>刪除選取的 Storage 與其檔案索引，不刪除來源檔案。資料庫會回收完整空白頁面；少量刪除可能不改變檔案大小。</li><li><strong>Export CSV：</strong>匯出符合搜尋条件的全部結果或指定 Storage，以 UTF-8 BOM 輸出，不受當頁筆數限制。</li></ul>

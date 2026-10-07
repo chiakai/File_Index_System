@@ -41,6 +41,7 @@ File Index System is a portable, offline file metadata indexer based on the V1 s
 - File sizes automatically use B, KB, MB, GB, TB, or PB. The number and unit may wrap separately on narrow screens.
 - Dates and times use the format selected under **Settings → Date and time format**. The date and time may wrap onto separate lines.
 - Click a search result to view its details. **Open Folder** opens the containing folder and selects the file when the desktop platform supports it.
+- **Open File** in File details opens the source file with the operating system's default application for that file type. The source must be online and the file must still exist; opening occurs only after an explicit user click.
 - **Relative path** in File details is the folder path relative to the Storage scan root and excludes the filename. Files directly in the root display `(Storage root)`.
 - On Windows, **Open Folder** passes the selection switch and full file path to File Explorer separately. PDF, text, Office, image, and extensionless files use the same flow, including paths containing spaces, commas, or Chinese characters.
 - Scan progress, **Cancel scan**, and **Exit File Index** appear in the top navigation area to the right of **Settings**.

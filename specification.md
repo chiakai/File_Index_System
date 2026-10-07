@@ -38,6 +38,7 @@ File Index System 是個人使用、離線、跨平台、Portable 的檔案中�
 | Search | 檔名／相對目錄部分比對、多關鍵字 AND、篩選、排序、分頁 |
 | File Details | 顯示索引資訊及來源可用狀態 |
 | Open Folder | 來源可用時開啟所在目錄，在支援的平台選取索引檔案 |
+| Open File | 來源可用且檔案存在時，以作業系統預設關聯程式開啟檔案 |
 | Storage | 新增、掃描、重掃、定位、檢視、編輯、匯出、刪除 |
 | Scan／Rescan | 遞迴讀取 Metadata，使用 staging 保護正式索引 |
 | CSV | 匯出全部搜尋結果或單一 Storage 索引 |
@@ -677,6 +678,7 @@ Base URL：`http://127.0.0.1:<port>/api/v1`。UI 位於 `/`。以下路徑皆省
 | GET | `/files/extensions` | extension／count 集合；可傳 storage_id |
 | GET | `/files/{id}` | File Details 與 storage.available |
 | POST | `/files/{id}/open-folder` | 依 File ID 開目錄；回 opened |
+| POST | `/files/{id}/open-file` | 依 File ID 驗證來源路徑，再以預設應用程式開啟；回 opened |
 | GET | `/storages` | Storage 列表與即時 available |
 | GET | `/storages/{id}` | Storage 完整資訊與兩個 Root |
 | PATCH | `/storages/{id}` | 僅修改 name、description |

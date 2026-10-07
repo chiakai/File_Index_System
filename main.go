@@ -710,6 +710,14 @@ func (a *App) fileRoute(w http.ResponseWriter, r *http.Request) {
 		a.openFolder(w, id)
 		return
 	}
+	if len(parts) == 5 && parts[4] == "open-file" {
+		if r.Method != "POST" {
+			httpError(w, 405, "METHOD_NOT_ALLOWED", "Method not allowed", nil)
+			return
+		}
+		a.openFile(w, id)
+		return
+	}
 	var f FileRow
 	var s storage
 	row := a.db.QueryRow("SELECT f.id,f.storage_id,s.name,f.name,COALESCE(f.extension,''),f.relative_path,f.size_bytes,f.modified_at,s.id,s.name,s.description,s.volume_label,s.filesystem_type,s.filesystem_id,s.capacity_bytes,s.last_scan_root,s.current_root,s.file_count,s.total_size_bytes,s.last_scan_at,s.created_at FROM files f JOIN storages s ON s.id=f.storage_id WHERE f.id=?", id)
@@ -722,34 +730,9 @@ func (a *App) fileRoute(w http.ResponseWriter, r *http.Request) {
 	jsonWrite(w, 200, map[string]any{"id": f.ID, "name": f.Name, "extension": f.Extension, "relative_path": f.RelativePath, "size_bytes": f.SizeBytes, "modified_at": nullString(f.ModifiedAt), "storage": map[string]any{"id": s.ID, "name": s.Name, "last_scan_at": nullString(s.LastScanAt), "available": s.Available}})
 }
 func (a *App) openFolder(w http.ResponseWriter, id int64) {
-	var path, name string
-	var cur sql.NullString
-	err := a.db.QueryRow("SELECT s.current_root,f.relative_path,f.name FROM files f JOIN storages s ON s.id=f.storage_id WHERE f.id=?", id).Scan(&cur, &path, &name)
+	target, code, err := a.indexedFileTarget(id)
 	if err != nil {
-		httpError(w, 404, "FILE_NOT_FOUND", "File not found", nil)
-		return
-	}
-	if !cur.Valid || cur.String == "" {
-		httpError(w, 422, "STORAGE_OFFLINE", "Storage is not available", nil)
-		return
-	}
-	root, err := filepath.EvalSymlinks(cur.String)
-	if err != nil {
-		httpError(w, 422, "STORAGE_OFFLINE", "Storage is not available", nil)
-		return
-	}
-	target, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(path), name))
-	if err != nil {
-		httpError(w, 422, "FILE_NOT_FOUND_ON_SOURCE", "The indexed file no longer exists at the current location", nil)
-		return
-	}
-	rel, err := filepath.Rel(root, target)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
-		httpError(w, 422, "DIRECTORY_NOT_FOUND", "Directory is outside the storage root", nil)
-		return
-	}
-	if st, e := os.Stat(target); e != nil || st.IsDir() {
-		httpError(w, 422, "FILE_NOT_FOUND_ON_SOURCE", "The indexed file no longer exists at the current location", nil)
+		indexedFileHTTPError(w, code, err)
 		return
 	}
 	cmd := fileManagerCommand(runtime.GOOS, target)
@@ -758,6 +741,56 @@ func (a *App) openFolder(w http.ResponseWriter, id int64) {
 		return
 	}
 	jsonWrite(w, 200, map[string]bool{"opened": true, "selected": true})
+}
+
+func (a *App) openFile(w http.ResponseWriter, id int64) {
+	target, code, err := a.indexedFileTarget(id)
+	if err != nil {
+		indexedFileHTTPError(w, code, err)
+		return
+	}
+	cmd := fileOpenCommand(runtime.GOOS, target)
+	if err = cmd.Start(); err != nil {
+		httpError(w, 500, "OPEN_FILE_FAILED", err.Error(), nil)
+		return
+	}
+	jsonWrite(w, 200, map[string]bool{"opened": true})
+}
+
+func indexedFileHTTPError(w http.ResponseWriter, code string, err error) {
+	status := 422
+	if code == "FILE_NOT_FOUND" {
+		status = 404
+	}
+	httpError(w, status, code, err.Error(), nil)
+}
+
+func (a *App) indexedFileTarget(id int64) (string, string, error) {
+	var path, name string
+	var cur sql.NullString
+	err := a.db.QueryRow("SELECT s.current_root,f.relative_path,f.name FROM files f JOIN storages s ON s.id=f.storage_id WHERE f.id=?", id).Scan(&cur, &path, &name)
+	if err != nil {
+		return "", "FILE_NOT_FOUND", errors.New("File not found")
+	}
+	if !cur.Valid || cur.String == "" {
+		return "", "STORAGE_OFFLINE", errors.New("Storage is not available")
+	}
+	root, err := filepath.EvalSymlinks(cur.String)
+	if err != nil {
+		return "", "STORAGE_OFFLINE", errors.New("Storage is not available")
+	}
+	target, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(path), name))
+	if err != nil {
+		return "", "FILE_NOT_FOUND_ON_SOURCE", errors.New("The indexed file no longer exists at the current location")
+	}
+	rel, err := filepath.Rel(root, target)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", "DIRECTORY_NOT_FOUND", errors.New("Directory is outside the storage root")
+	}
+	if st, e := os.Stat(target); e != nil || st.IsDir() {
+		return "", "FILE_NOT_FOUND_ON_SOURCE", errors.New("The indexed file no longer exists at the current location")
+	}
+	return target, "", nil
 }
 
 func fileManagerCommand(platform, target string) *exec.Cmd {
@@ -772,6 +805,17 @@ func fileManagerCommand(platform, target string) *exec.Cmd {
 	default:
 		uri := (&url.URL{Scheme: "file", Path: filepath.ToSlash(target)}).String()
 		return exec.Command("dbus-send", "--session", "--dest=org.freedesktop.FileManager1", "--type=method_call", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowItems", "array:string:"+uri, "string:")
+	}
+}
+
+func fileOpenCommand(platform, target string) *exec.Cmd {
+	switch platform {
+	case "windows":
+		return exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", target)
+	case "darwin":
+		return exec.Command("open", target)
+	default:
+		return exec.Command("xdg-open", target)
 	}
 }
 

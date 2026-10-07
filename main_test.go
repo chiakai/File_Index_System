@@ -112,6 +112,71 @@ func TestWindowsOpenFolderArgumentsAreExtensionIndependent(t *testing.T) {
 	}
 }
 
+func TestOpenFileCommandsUseDefaultApplication(t *testing.T) {
+	targets := []string{
+		`D:\Indexed files\manual.pdf`,
+		`D:\Indexed files\notes.txt`,
+		`D:\Indexed files\document.docx`,
+		`D:\Indexed files\image.jpg`,
+		`D:\Indexed files\no-extension`,
+		`D:\Indexed files\中文 檔案,版本 2.pdf`,
+	}
+	for _, target := range targets {
+		t.Run(filepath.Base(target), func(t *testing.T) {
+			tests := []struct {
+				platform string
+				want     []string
+			}{
+				{"windows", []string{"rundll32.exe", "url.dll,FileProtocolHandler", target}},
+				{"darwin", []string{"open", target}},
+				{"linux", []string{"xdg-open", target}},
+			}
+			for _, test := range tests {
+				cmd := fileOpenCommand(test.platform, target)
+				if len(cmd.Args) != len(test.want) {
+					t.Fatalf("%s args = %#v; want %#v", test.platform, cmd.Args, test.want)
+				}
+				for i := range test.want {
+					if cmd.Args[i] != test.want[i] {
+						t.Fatalf("%s args = %#v; want %#v", test.platform, cmd.Args, test.want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestIndexedFileTargetSupportsRootAndNestedFiles(t *testing.T) {
+	app := testApp(t)
+	root := filepath.Join(app.root, "source")
+	nested := filepath.Join(root, "folder")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	result, err := app.db.Exec("INSERT INTO storages(name,last_scan_root,current_root,created_at) VALUES(?,?,?,?)", "source", root, root, now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	storageID, _ := result.LastInsertId()
+	for _, tc := range []struct{ name, relative string }{{"root.pdf", ""}, {"nested.txt", "folder"}} {
+		t.Run(tc.name, func(t *testing.T) {
+			filePath := filepath.Join(root, filepath.FromSlash(tc.relative), tc.name)
+			if err := os.WriteFile(filePath, []byte("test"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			insert, err := app.db.Exec("INSERT INTO files(storage_id,name,relative_path,size_bytes) VALUES(?,?,?,?)", storageID, tc.name, tc.relative, 4)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fileID, _ := insert.LastInsertId()
+			got, code, err := app.indexedFileTarget(fileID)
+			if err != nil || code != "" || got != filePath {
+				t.Fatalf("target = %q, code = %q, err = %v; want %q", got, code, err, filePath)
+			}
+		})
+	}
+}
+
 func TestMigrateRejectsNewerSchema(t *testing.T) {
 	db, err := openDatabase(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
